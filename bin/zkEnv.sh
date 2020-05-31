@@ -24,7 +24,7 @@
 # a sibling of this script's directory.
 # Or you can specify the ZOOCFGDIR using the
 # '--config' option in the command line.
-
+## 定义变量ZOOBINDIR 如果没有定义则设置默认值  /usr/bin
 ZOOBINDIR="${ZOOBINDIR:-/usr/bin}"
 ZOOKEEPER_PREFIX="${ZOOBINDIR}/.."
 

@@ -23,10 +23,14 @@
 
 
 # use POSIX interface, symlink is followed automatically
+## 获取当前执行的脚本文件的全路径
 ZOOBIN="${BASH_SOURCE-$0}"
+## 获取目录
 ZOOBIN="$(dirname "${ZOOBIN}")"
+## 进入到模流, 并获取其目录
 ZOOBINDIR="$(cd "${ZOOBIN}"; pwd)"
 
+# 如果存在 libexec/zkEnv.sh 则执行
 if [ -e "$ZOOBIN/../libexec/zkEnv.sh" ]; then
   . "$ZOOBINDIR"/../libexec/zkEnv.sh
 else
@@ -37,6 +41,7 @@ fi
 # up the JVM to accept JMX remote management:
 # http://java.sun.com/javase/6/docs/technotes/guides/management/agent.html
 # by default we allow local JMX connections
+## 设置jmx
 if [ "x$JMXLOCALONLY" = "x" ]
 then
     JMXLOCALONLY=false
