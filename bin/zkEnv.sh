@@ -25,10 +25,13 @@
 # Or you can specify the ZOOCFGDIR using the
 # '--config' option in the command line.
 ## 定义变量ZOOBINDIR 如果没有定义则设置默认值  /usr/bin
+# /opt/zookeeper-3.4.14/bin
 ZOOBINDIR="${ZOOBINDIR:-/usr/bin}"
+## /opt/zookeeper-3.4.14/bin/..
 ZOOKEEPER_PREFIX="${ZOOBINDIR}/.."
 
 #check to see if the conf dir is given as an optional argument
+# 查看是否给出配置文件目录
 if [ $# -gt 1 ]
 then
     if [ "--config" = "$1" ]
@@ -39,7 +42,7 @@ then
 	      ZOOCFGDIR=$confdir
     fi
 fi
-
+# 如果在运行时 没有以参数给定配置文件目录, 那就使用下面配置的
 if [ "x$ZOOCFGDIR" = "x" ]
 then
   if [ -e "${ZOOKEEPER_PREFIX}/conf" ]; then
@@ -49,32 +52,37 @@ then
   fi
 fi
 
+# 如果存在zookeeper-env.sh文件, 就执行
 if [ -f "${ZOOCFGDIR}/zookeeper-env.sh" ]; then
   . "${ZOOCFGDIR}/zookeeper-env.sh"
 fi
 
+# 没有指定配置文件的话, 就使用zoo.cfg文件
 if [ "x$ZOOCFG" = "x" ]
 then
     ZOOCFG="zoo.cfg"
 fi
 
+# 修改配置文件为 路径加名字
 ZOOCFG="$ZOOCFGDIR/$ZOOCFG"
 
+# 如果有 java.env文件,则执行
 if [ -f "$ZOOCFGDIR/java.env" ]
 then
     . "$ZOOCFGDIR/java.env"
 fi
 
+# 设置日志目录
 if [ "x${ZOO_LOG_DIR}" = "x" ]
 then
     ZOO_LOG_DIR="$ZOOKEEPER_PREFIX/logs"
 fi
-
+# 设置日志输出方法以及日志级别
 if [ "x${ZOO_LOG4J_PROP}" = "x" ]
 then
     ZOO_LOG4J_PROP="INFO,CONSOLE"
 fi
-
+# 使用type来获取java全路径名  type build-in cmd
 if [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/java" ]];  then
     JAVA="$JAVA_HOME/bin/java"
 elif type -p java; then
@@ -86,7 +94,7 @@ fi
 
 #add the zoocfg dir to classpath
 CLASSPATH="$ZOOCFGDIR:$CLASSPATH"
-
+# 把依赖添加进classpath
 for i in "$ZOOBINDIR"/../zookeeper-server/src/main/resources/lib/*.jar
 do
     CLASSPATH="$i:$CLASSPATH"

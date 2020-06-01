@@ -23,7 +23,10 @@
 
 
 # use POSIX interface, symlink is followed automatically
-## 获取当前执行的脚本文件的全路径
+## 获取用户执行时所在的目录 到当前脚本的目录
+# 如: 脚本在 /mnt/zkServer.sh 用户在 /root家目录下执行,则执行时: ZOOBIN值为 /mnt/zkServer.sh
+# 而用户在 /mnt/ 目录下执行时, ZOOBIN目录为   . 当前目录
+# /opt/zookeeper-3.4.14/bin
 ZOOBIN="${BASH_SOURCE-$0}"
 ## 获取目录
 ZOOBIN="$(dirname "${ZOOBIN}")"
@@ -75,10 +78,15 @@ then
     echo "ZooKeeper remote JMX log4j set to $JMXLOG4J" >&2
     if [ "x$JMXHOSTNAME" = "x" ]
     then
-      ZOOMAIN="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$JMXPORT -Dcom.sun.management.jmxremote.authenticate=$JMXAUTH -Dcom.sun.management.jmxremote.ssl=$JMXSSL -Dzookeeper.jmx.log4j.disable=$JMXLOG4J org.apache.zookeeper.server.quorum.QuorumPeerMain"
+      ZOOMAIN="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=$JMXPORT
+      -Dcom.sun.management.jmxremote.authenticate=$JMXAUTH -Dcom.sun.management.jmxremote.ssl=$JMXSSL
+      -Dzookeeper.jmx.log4j.disable=$JMXLOG4J org.apache.zookeeper.server.quorum.QuorumPeerMain"
     else
       echo "ZooKeeper remote JMX Hostname set to $JMXHOSTNAME" >&2
-      ZOOMAIN="-Dcom.sun.management.jmxremote -Djava.rmi.server.hostname=$JMXHOSTNAME -Dcom.sun.management.jmxremote.port=$JMXPORT -Dcom.sun.management.jmxremote.authenticate=$JMXAUTH -Dcom.sun.management.jmxremote.ssl=$JMXSSL -Dzookeeper.jmx.log4j.disable=$JMXLOG4J org.apache.zookeeper.server.quorum.QuorumPeerMain"
+      ZOOMAIN="-Dcom.sun.management.jmxremote -Djava.rmi.server.hostname=$JMXHOSTNAME
+      -Dcom.sun.management.jmxremote.port=$JMXPORT -Dcom.sun.management.jmxremote.authenticate=$JMXAUTH
+      -Dcom.sun.management.jmxremote.ssl=$JMXSSL
+      -Dzookeeper.jmx.log4j.disable=$JMXLOG4J org.apache.zookeeper.server.quorum.QuorumPeerMain"
     fi
   fi
 else
