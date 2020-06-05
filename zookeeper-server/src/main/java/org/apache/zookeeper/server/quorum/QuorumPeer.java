@@ -910,6 +910,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             LOG.warn("Problem starting AdminServer", e);
             System.out.println(e);
         }
+        // 开始leader选举
         startLeaderElection();
         super.start();
     }
@@ -966,6 +967,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     synchronized public void startLeaderElection() {
        try {
            if (getPeerState() == ServerState.LOOKING) {
+               // 创建选票
                currentVote = new Vote(myid, getLastLoggedZxid(), getCurrentEpoch());
            }
        } catch(IOException e) {
@@ -979,13 +981,16 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         //}
         if (electionType == 0) {
             try {
+                // 创建udpsocket
                 udpSocket = new DatagramSocket(getQuorumAddress().getPort());
+                // 响应线程
                 responder = new ResponderThread();
                 responder.start();
             } catch (SocketException e) {
                 throw new RuntimeException(e);
             }
         }
+        // 选举算法
         this.electionAlg = createElectionAlgorithm(electionType);
     }
 
@@ -1101,9 +1106,11 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 LOG.warn("Clobbering already-set QuorumCnxManager (restarting leader election?)");
                 oldQcm.halt();
             }
+            // 启动listener 处理连接请求
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
                 listener.start();
+                // 快速leader选举
                 FastLeaderElection fle = new FastLeaderElection(this, qcm);
                 fle.start();
                 le = fle;

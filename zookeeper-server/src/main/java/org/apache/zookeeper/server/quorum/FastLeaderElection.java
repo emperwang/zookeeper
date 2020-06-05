@@ -206,7 +206,7 @@ public class FastLeaderElection implements Election {
          * Receives messages from instance of QuorumCnxManager on
          * method run(), and processes such messages.
          */
-
+        // 处理接收
         class WorkerReceiver extends ZooKeeperThread  {
             volatile boolean stop;
             QuorumCnxManager manager;
@@ -223,6 +223,7 @@ public class FastLeaderElection implements Election {
                 while (!stop) {
                     // Sleeps on receive
                     try {
+                        // 从接收队列中获取消息来处理
                         response = manager.pollRecvQueue(3000, TimeUnit.MILLISECONDS);
                         if(response == null) continue;
 
@@ -450,9 +451,10 @@ public class FastLeaderElection implements Election {
             public void run() {
                 while (!stop) {
                     try {
+                        // 从队列中获取要发送的信息
                         ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS);
                         if(m == null) continue;
-
+                        // 处理消息
                         process(m);
                     } catch (InterruptedException e) {
                         break;
@@ -467,13 +469,14 @@ public class FastLeaderElection implements Election {
              * @param m     message to send
              */
             void process(ToSend m) {
+                // 创建一个信息
                 ByteBuffer requestBuffer = buildMsg(m.state.ordinal(),
                                                     m.leader,
                                                     m.zxid,
                                                     m.electionEpoch,
                                                     m.peerEpoch,
                                                     m.configData);
-
+                // 发送消息
                 manager.toSend(m.sid, requestBuffer);
 
             }

@@ -254,6 +254,7 @@ public class QuorumCnxManager {
                             boolean listenOnAllIPs,
                             int quorumCnxnThreadsSize,
                             boolean quorumSaslAuthEnabled) {
+        // 初始化队列信息
         this.recvQueue = new ArrayBlockingQueue<Message>(RECV_CAPACITY);
         this.queueSendMap = new ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>>();
         this.senderWorkerMap = new ConcurrentHashMap<Long, SendWorker>();
@@ -275,6 +276,7 @@ public class QuorumCnxManager {
                 quorumSaslAuthEnabled);
 
         // Starts listener thread that waits for connection requests
+        // 此listener 处理连接请求
         listener = new Listener();
         listener.setName("QuorumPeerListener");
     }

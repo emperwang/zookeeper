@@ -77,8 +77,10 @@ public class QuorumPeerMain {
      * @param args path to the configfile
      */
     public static void main(String[] args) {
+        // 创建一个 QuorumPeerMain
         QuorumPeerMain main = new QuorumPeerMain();
         try {
+            // 根据传递进来的参数 进行初始化
             main.initializeAndRun(args);
         } catch (IllegalArgumentException e) {
             LOG.error("Invalid arguments, exiting abnormally", e);
@@ -108,8 +110,10 @@ public class QuorumPeerMain {
     protected void initializeAndRun(String[] args)
         throws ConfigException, IOException, AdminServerException
     {
+        // 创建一个配置类,主要用来保存配置文件中的配置
         QuorumPeerConfig config = new QuorumPeerConfig();
         if (args.length == 1) {
+            // 配置文件解析
             config.parse(args[0]);
         }
 
@@ -173,6 +177,7 @@ public class QuorumPeerMain {
           quorumPeer.setInitLimit(config.getInitLimit());
           quorumPeer.setSyncLimit(config.getSyncLimit());
           quorumPeer.setConfigFileName(config.getConfigFilename());
+          // 数据树 除了在磁盘有一份保存外,还有一份在 内存中有一个信息树
           quorumPeer.setZKDatabase(new ZKDatabase(quorumPeer.getTxnFactory()));
           quorumPeer.setQuorumVerifier(config.getQuorumVerifier(), false);
           if (config.getLastSeenQuorumVerifier()!=null) {

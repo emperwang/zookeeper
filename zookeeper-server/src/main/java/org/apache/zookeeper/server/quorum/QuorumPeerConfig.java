@@ -137,7 +137,7 @@ public class QuorumPeerConfig {
                 .warnForRelativePath()
                 .failForNonExistingPath()
                 .build()).create(path);
-                
+            // 按照 properties 来加载
             Properties cfg = new Properties();
             FileInputStream in = new FileInputStream(configFile);
             try {
@@ -146,7 +146,7 @@ public class QuorumPeerConfig {
             } finally {
                 in.close();
             }
-            
+            // 解析配置
             parseProperties(cfg);
         } catch (IOException e) {
             throw new ConfigException("Error processing " + path, e);
@@ -599,7 +599,9 @@ public class QuorumPeerConfig {
     void setupQuorumPeerConfig(Properties prop, boolean configBackwardCompatibilityMode)
             throws IOException, ConfigException {
         quorumVerifier = parseDynamicConfig(prop, electionAlg, true, configBackwardCompatibilityMode);
+        // 读取 Myid 文件
         setupMyId();
+        //
         setupClientPort();
         setupPeerType();
         checkValidity();
