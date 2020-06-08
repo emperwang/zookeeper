@@ -173,6 +173,9 @@ public class QuorumPeerConfig {
                } finally {
                    inConfig.close();
                }
+               // 动态配置的解析
+               //1. myid文件读取
+               //2. 读取集群配置 server.1=....:288:3888
                setupQuorumPeerConfig(dynamicCfg, false);
 
            } catch (IOException e) {
@@ -241,11 +244,14 @@ public class QuorumPeerConfig {
         for (Entry<Object, Object> entry : zkProp.entrySet()) {
             String key = entry.getKey().toString().trim();
             String value = entry.getValue().toString().trim();
+            // 数据保存的目录
             if (key.equals("dataDir")) {
                 dataDir = vff.create(value);
+                //
             } else if (key.equals("dataLogDir")) {
                 dataLogDir = vff.create(value);
             } else if (key.equals("clientPort")) {
+                // 端口
                 clientPort = Integer.parseInt(value);
             } else if (key.equals("localSessionsEnabled")) {
                 localSessionsEnabled = Boolean.parseBoolean(value);
@@ -405,7 +411,7 @@ public class QuorumPeerConfig {
         if (tickTime == 0) {
             throw new IllegalArgumentException("tickTime is not set");
         }
-
+        // 可以看到如果没有配置sessionTimeout值,则分别是tickTime的2倍 或 20倍
         minSessionTimeout = minSessionTimeout == -1 ? tickTime * 2 : minSessionTimeout;
         maxSessionTimeout = maxSessionTimeout == -1 ? tickTime * 20 : maxSessionTimeout;
 
@@ -592,18 +598,22 @@ public class QuorumPeerConfig {
              * The default QuorumVerifier is QuorumMaj
              */        
             //LOG.info("Defaulting to majority quorums");
+           // 解析集群中其他节点的地址
             return new QuorumMaj(dynamicConfigProp);            
         }          
     }
 
     void setupQuorumPeerConfig(Properties prop, boolean configBackwardCompatibilityMode)
             throws IOException, ConfigException {
+        // 记录集群信息
         quorumVerifier = parseDynamicConfig(prop, electionAlg, true, configBackwardCompatibilityMode);
         // 读取 Myid 文件
         setupMyId();
-        //
+        // 对clientAddr的校验
         setupClientPort();
+        // 设置自己的角色
         setupPeerType();
+        // 校验
         checkValidity();
     }
 
@@ -626,7 +636,7 @@ public class QuorumPeerConfig {
                throw new ConfigException("Unrecognised parameter: " + key);                
             }
         }
-        
+        // 创建
         QuorumVerifier qv = createQuorumVerifier(dynamicConfigProp, isHierarchical);
                
         int numParticipators = qv.getVotingMembers().size();
@@ -698,6 +708,7 @@ public class QuorumPeerConfig {
         if (serverId == UNSET_SERVERID) {
             return;
         }
+        // 对clientAddr的校验
         QuorumServer qs = quorumVerifier.getAllMembers().get(serverId);
         if (clientPortAddress != null && qs != null && qs.clientAddr != null) {
             if ((!clientPortAddress.getAddress().isAnyLocalAddress()

@@ -123,6 +123,7 @@ public class WorkerService {
         if (size > 0) {
             try {
                 // make sure to map negative ids as well to [0, size-1]
+                // 放到线程池中 执行
                 int workerNum = ((int) (id % size) + size) % size;
                 ExecutorService worker = workers.get(workerNum);
                 worker.execute(scheduledWorkRequest);
@@ -133,6 +134,7 @@ public class WorkerService {
         } else {
             // When there is no worker thread pool, do the work directly
             // and wait for its completion
+            // 如果没有线程池，则在本线程执行
             scheduledWorkRequest.run();
         }
     }
@@ -197,8 +199,10 @@ public class WorkerService {
 
     public void start() {
         if (numWorkerThreads > 0) {
+            // 多个线程池
             if (threadsAreAssignable) {
                 for(int i = 1; i <= numWorkerThreads; ++i) {
+                    // DaemonThreadFactory 线程工厂,创建出的线程是daemon线程
                     workers.add(Executors.newFixedThreadPool(
                         1, new DaemonThreadFactory(threadNamePrefix, i)));
                 }

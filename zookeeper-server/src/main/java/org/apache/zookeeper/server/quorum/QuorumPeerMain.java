@@ -118,6 +118,7 @@ public class QuorumPeerMain {
         }
 
         // Start and schedule the the purge task
+        // 数据清理线程
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(config
                 .getDataDir(), config.getDataLogDir(), config
                 .getSnapRetainCount(), config.getPurgeInterval());
@@ -137,6 +138,7 @@ public class QuorumPeerMain {
             throws IOException, AdminServerException
     {
       try {
+          // jmx
           ManagedUtil.registerLog4jMBeans();
       } catch (JMException e) {
           LOG.warn("Unable to register log4j JMX control", e);
@@ -148,7 +150,9 @@ public class QuorumPeerMain {
           ServerCnxnFactory secureCnxnFactory = null;
 
           if (config.getClientPortAddress() != null) {
+              // 通过反射创建NIOServerCnxnFactory, NIO 通信
               cnxnFactory = ServerCnxnFactory.createFactory();
+              // 创建 NioServerSocket 以及 worker处理IO的线程
               cnxnFactory.configure(config.getClientPortAddress(),
                       config.getMaxClientCnxns(),
                       false);
@@ -160,8 +164,9 @@ public class QuorumPeerMain {
                       config.getMaxClientCnxns(),
                       true);
           }
-
+            // 创建 quorumPeer
           quorumPeer = getQuorumPeer();
+          // 检测  snap  datalog  目录
           quorumPeer.setTxnFactory(new FileTxnSnapLog(
                       config.getDataLogDir(),
                       config.getDataDir()));
@@ -169,6 +174,7 @@ public class QuorumPeerMain {
           quorumPeer.enableLocalSessionsUpgrading(
               config.isLocalSessionsUpgradingEnabled());
           //quorumPeer.setQuorumPeers(config.getAllMembers());
+          // 选举算法
           quorumPeer.setElectionType(config.getElectionAlg());
           quorumPeer.setMyid(config.getServerId());
           quorumPeer.setTickTime(config.getTickTime());
@@ -178,7 +184,9 @@ public class QuorumPeerMain {
           quorumPeer.setSyncLimit(config.getSyncLimit());
           quorumPeer.setConfigFileName(config.getConfigFilename());
           // 数据树 除了在磁盘有一份保存外,还有一份在 内存中有一个信息树
+          // 此处就是创建 内存中的数据树
           quorumPeer.setZKDatabase(new ZKDatabase(quorumPeer.getTxnFactory()));
+          // getQuorumVerifier此属性很重要,记录了集群中的其他节点的信息,以及各个节点的角色
           quorumPeer.setQuorumVerifier(config.getQuorumVerifier(), false);
           if (config.getLastSeenQuorumVerifier()!=null) {
               quorumPeer.setLastSeenQuorumVerifier(config.getLastSeenQuorumVerifier(), false);
@@ -205,8 +213,9 @@ public class QuorumPeerMain {
               quorumPeer.setQuorumLearnerLoginContext(config.quorumLearnerLoginContext);
           }
           quorumPeer.setQuorumCnxnThreadsSize(config.quorumCnxnThreadsSize);
+          // auth相关的配置
           quorumPeer.initialize();
-          
+          //
           quorumPeer.start();
           quorumPeer.join();
       } catch (InterruptedException e) {

@@ -86,17 +86,21 @@ public class QuorumMaj implements QuorumVerifier {
             if (key.startsWith("server.")) {
                 int dot = key.indexOf('.');
                 long sid = Long.parseLong(key.substring(dot + 1));
+                // 看到此处的记录,每一个server对应一条记录; key为myid, value为QuorumServer
                 QuorumServer qs = new QuorumServer(sid, value);
                 allMembers.put(Long.valueOf(sid), qs);
                 if (qs.type == LearnerType.PARTICIPANT)
+                    // 拥有投票权的成员
                     votingMembers.put(Long.valueOf(sid), qs);
                 else {
+                    // 观察者的成员
                     observingMembers.put(Long.valueOf(sid), qs);
                 }
             } else if (key.equals("version")) {
                 version = Long.parseLong(value, 16);
             }
         }
+        // 记录半数
         half = votingMembers.size() / 2;
     }
 

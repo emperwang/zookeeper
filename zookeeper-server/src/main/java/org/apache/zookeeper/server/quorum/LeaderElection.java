@@ -54,18 +54,23 @@ public class LeaderElection implements Election  {
     }
 
     protected static class ElectionResult {
+        // 此保存zxid 或者 myid最大的选票
         public Vote vote;
-
+        // 选票数
         public int count;
-
+        // 获胜者的选票
         public Vote winner;
-
+        // 获胜者的选票数
         public int winningCount;
-
+        // 有效的选票数
         public int numValidVotes;
     }
 
+    /**
+     *  todo 重要  重要  leader选举
+     */
     protected ElectionResult countVotes(HashMap<InetSocketAddress, Vote> votes, HashSet<Long> heardFrom) {
+        // 记录选举结果
         final ElectionResult result = new ElectionResult();
         // Initialize with null vote
         result.vote = new Vote(Long.MIN_VALUE, Long.MIN_VALUE);
@@ -76,6 +81,7 @@ public class LeaderElection implements Election  {
         // different zxids for a server depending on timing.
         final HashMap<InetSocketAddress, Vote> validVotes = new HashMap<InetSocketAddress, Vote>();
         final Map<Long, Long> maxZxids = new HashMap<Long,Long>();
+        // 遍历获取有效的选票 以及  得到最大的 zxid
         for (Map.Entry<InetSocketAddress, Vote> e : votes.entrySet()) {
             // Only include votes from machines that we heard from
             final Vote v = e.getValue();
@@ -96,14 +102,16 @@ public class LeaderElection implements Election  {
             if (v.getZxid() < zxid) {
                 // This is safe inside an iterator as per
                 // http://download.oracle.com/javase/1.5.0/docs/api/java/util/Map.Entry.html
+                // 把有效选票中的zxid更新为 最大的zxid
                 e.setValue(new Vote(v.getId(), zxid, v.getElectionEpoch(), v.getPeerEpoch(), v.getState()));
             }
         }
-
+        // 记录有效选票的个数
         result.numValidVotes = validVotes.size();
 
         final HashMap<Vote, Integer> countTable = new HashMap<Vote, Integer>();
         // Now do the tally
+        // 遍历更新得到 zxid 或者  id值 最大的选票
         for (Vote v : validVotes.values()) {
             Integer count = countTable.get(v);
             if (count == null) {
@@ -120,6 +128,7 @@ public class LeaderElection implements Election  {
         }
         result.winningCount = 0;
         LOG.info("Election tally: ");
+        // 遍历来得到获胜者
         for (Entry<Vote, Integer> entry : countTable.entrySet()) {
             if (entry.getValue() > result.winningCount) {
                 result.winningCount = entry.getValue();
@@ -152,6 +161,7 @@ public class LeaderElection implements Election  {
         }
 
         try {
+            // 1. 首先设置选票为自己
             self.setCurrentVote(new Vote(self.getId(),
                     self.getLastLoggedZxid()));
             // We are going to look for a leader by casting a vote for ourself
@@ -174,6 +184,7 @@ public class LeaderElection implements Election  {
                     responseBytes.length);
             int xid = epochGen.nextInt();
             while (self.isRunning()) {
+                // 得到有投票权的 server
                 HashMap<InetSocketAddress, Vote> votes =
                     new HashMap<InetSocketAddress, Vote>(self.getVotingView().size());
 
@@ -181,9 +192,11 @@ public class LeaderElection implements Election  {
                 requestBuffer.putInt(xid);
                 requestPacket.setLength(4);
                 HashSet<Long> heardFrom = new HashSet<Long>();
+                // 遍历所有的有投票权的 server, 对其发送自己的选票
                 for (QuorumServer server : self.getVotingView().values()) {
                     LOG.info("Server address: " + server.addr);
                     try {
+                        // 设置包的地址
                         requestPacket.setSocketAddress(server.addr);
                     } catch (IllegalArgumentException e) {
                         // Sun doesn't include the address that causes this
@@ -196,29 +209,37 @@ public class LeaderElection implements Election  {
                     }
 
                     try {
+                        // 发送自己的选票
                         s.send(requestPacket);
+                        // 设置响应包的长度
                         responsePacket.setLength(responseBytes.length);
+                        // 读取响应包
                         s.receive(responsePacket);
+                        // 如果长度不合适, 进行下一个
                         if (responsePacket.getLength() != responseBytes.length) {
                             LOG.error("Got a short response: "
                                     + responsePacket.getLength());
                             continue;
                         }
                         responseBuffer.clear();
+                        // 接收对端的 xid
                         int recvedXid = responseBuffer.getInt();
                         if (recvedXid != xid) {
                             LOG.error("Got bad xid: expected " + xid
                                     + " got " + recvedXid);
                             continue;
                         }
+                        //
                         long peerId = responseBuffer.getLong();
                         heardFrom.add(peerId);
                         //if(server.id != peerId){
+                        // 记录对端的id  zxid
                             Vote vote = new Vote(responseBuffer.getLong(),
                                 responseBuffer.getLong());
                             InetSocketAddress addr =
                                 (InetSocketAddress) responsePacket
                                 .getSocketAddress();
+                             // 记录地址和 选票的关系
                             votes.put(addr, vote);
                         //}
                     } catch (IOException e) {
@@ -228,22 +249,29 @@ public class LeaderElection implements Election  {
                         // down
                     }
                 }
-
+                // 计算获胜者, 也就是对选票进行 对比
                 ElectionResult result = countVotes(votes, heardFrom);
                 // ZOOKEEPER-569:
                 // If no votes are received for live peers, reset to voting 
                 // for ourselves as otherwise we may hang on to a vote 
                 // for a dead peer                 
                 if (result.numValidVotes == 0) {
+                    // 如果有效选票为0, 那么把自己当前的选票  设置为自己
                     self.setCurrentVote(new Vote(self.getId(),
                             self.getLastLoggedZxid()));
                 } else {
+                    // 选票获胜者的 id大于0, 则继续进行操作
                     if (result.winner.getId() >= 0) {
+                        // 更新当前选票为 有效选票中 zxid 或者 myid最大的选票
                         self.setCurrentVote(result.vote);
                         // To do: this doesn't use a quorum verifier
+                        // 获胜者的有效票数  大于  半数
                         if (result.winningCount > (self.getVotingView().size() / 2)) {
+                            // 更新当前选票为 获胜者选票
                             self.setCurrentVote(result.winner);
+                            // 关闭
                             s.close();
+                            // 自己当前的选票
                             Vote current = self.getCurrentVote();
                             LOG.info("Found leader: my type is: " + self.getLearnerType());
                             /*
@@ -253,6 +281,7 @@ public class LeaderElection implements Election  {
                              * FOLLOWING. However if we are an OBSERVER, it is an
                              * error to be elected as a Leader.
                              */
+                            // 如果当前节点是 OBSERVER 且被选举为leader 则报错
                             if (self.getLearnerType() == LearnerType.OBSERVER) {
                                 if (current.getId() == self.getId()) {
                                     // This should never happen!
@@ -265,6 +294,7 @@ public class LeaderElection implements Election  {
                                     return current;
                                 }
                             } else {
+                                // 如果当前节点角色不是 observer, 则更新状态为 leader或 follower
                                 self.setPeerState((current.getId() == self.getId())
                                         ? ServerState.LEADING: ServerState.FOLLOWING);
                                 if (self.getPeerState() == ServerState.FOLLOWING) {

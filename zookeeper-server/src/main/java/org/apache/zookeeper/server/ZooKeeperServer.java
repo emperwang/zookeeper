@@ -455,7 +455,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         if (sessionTracker == null) {
             createSessionTracker();
         }
+        // session的处理
         startSessionTracker();
+        // 同步请求线程的处理
         setupRequestProcessors();
 
         registerJMX();

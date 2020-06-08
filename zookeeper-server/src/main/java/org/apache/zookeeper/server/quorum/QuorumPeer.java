@@ -237,9 +237,14 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         private static final String wrongFormat = " does not have the form server_config or server_config;client_config"+
         " where server_config is host:port:port or host:port:port:type and client_config is port or host:port";
 
+        /**
+         * todo  解析 server.1=10.0.0.0:2888:3888  配置的解析
+         */
         public QuorumServer(long sid, String addressStr) throws ConfigException {
             // LOG.warn("sid = " + sid + " addressStr = " + addressStr);
+            // 记录此server对应的myid
             this.id = sid;
+            // 解析地址
             String serverClientParts[] = addressStr.split(";");
             String serverParts[] = splitWithLeadingHostname(serverClientParts[0]);
             if ((serverClientParts.length > 2) || (serverParts.length < 3)
@@ -273,6 +278,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 throw new ConfigException("Address unresolved: " + serverParts[0] + ":" + serverParts[1]);
             }
             try {
+                // 选举地址
                 electionAddr = new InetSocketAddress(serverParts[0],
                         Integer.parseInt(serverParts[2]));
             } catch (NumberFormatException e) {
@@ -283,13 +289,13 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 throw new ConfigException(
                         "Client and election port must be different! Please update the configuration file on server." + sid);
             }
-
+            // 类型, observer follower角色
             if (serverParts.length == 4) {
                 setType(serverParts[3]);
             }
 
             this.hostname = serverParts[0];
-            
+            // 把解析的地址记录起来, 并去除自己的地址
             setMyAddrs();
         }
 
@@ -305,7 +311,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             this.electionAddr = electionAddr;
             this.type = type;
             this.clientAddr = clientAddr;
-
+            // 把解析的地址记录起来, 并去除自己的地址
             setMyAddrs();
         }
 
@@ -314,6 +320,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             this.myAddrs.add(this.addr);
             this.myAddrs.add(this.clientAddr);
             this.myAddrs.add(this.electionAddr);
+            // 去除自己的地址
             this.myAddrs = excludedSpecialAddresses(this.myAddrs);
         }
 
@@ -837,6 +844,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         super("QuorumPeer");
         quorumStats = new QuorumStats(this);
         jmxRemotePeerBean = new HashMap<Long, RemotePeerBean>();
+        // 反射创建org.apache.zookeeper.server.admin.JettyAdminServer
         adminServer = AdminServerFactory.createAdminServer();
         x509Util = new QuorumX509Util();
         initialize();
@@ -902,6 +910,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         if (!getView().containsKey(myid)) {
             throw new RuntimeException("My id " + myid + " not in the peer list");
          }
+        // 加载磁盘数据
         loadDataBase();
         startServerCnxnFactory();
         try {
@@ -910,8 +919,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             LOG.warn("Problem starting AdminServer", e);
             System.out.println(e);
         }
-        // 开始leader选举
+        // 开始leader选举前的准备
         startLeaderElection();
+        // 开始选举
         super.start();
     }
 
@@ -968,6 +978,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
        try {
            if (getPeerState() == ServerState.LOOKING) {
                // 创建选票
+               // 由此可见,第一次选举投票,选举的是自己
                currentVote = new Vote(myid, getLastLoggedZxid(), getCurrentEpoch());
            }
        } catch(IOException e) {
@@ -990,7 +1001,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 throw new RuntimeException(e);
             }
         }
-        // 选举算法
+        // 创建选举算法
         this.electionAlg = createElectionAlgorithm(electionType);
     }
 
@@ -1193,12 +1204,14 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         try {
             /*
              * Main loop
+             * todo 重要  选举的操作
              */
             while (running) {
+                // 根据不同的状态,来进行不同的操作
                 switch (getPeerState()) {
                 case LOOKING:
                     LOG.info("LOOKING");
-
+                    // 是否是可读的模式
                     if (Boolean.getBoolean("readonlymode.enabled")) {
                         LOG.info("Attempting to start ReadOnlyZooKeeperServer");
 
@@ -1251,6 +1264,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                                shuttingDownLE = false;
                                startLeaderElection();
                                }
+                            // leader选举
+                            // 设置选票为 leader选票
                             setCurrentVote(makeLEStrategy().lookForLeader());
                         } catch (Exception e) {
                             LOG.warn("Unexpected exception", e);
@@ -1262,6 +1277,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                     try {
                         LOG.info("OBSERVING");
                         setObserver(makeObserver(logFactory));
+                        // 找到leader 并 注册
                         observer.observeLeader();
                     } catch (Exception e) {
                         LOG.warn("Unexpected exception",e );
@@ -1650,6 +1666,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     
     public QuorumVerifier setQuorumVerifier(QuorumVerifier qv, boolean writeToDisk){
         synchronized (QV_LOCK) {
+            // 如果上次版本号大,则不更新
             if ((quorumVerifier != null) && (quorumVerifier.getVersion() >= qv.getVersion())) {
                 // this is normal. For example - server found out about new config through FastLeaderElection gossiping
                 // and then got the same config in UPTODATE message so its already known
@@ -1659,9 +1676,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             }
             QuorumVerifier prevQV = quorumVerifier;
             quorumVerifier = qv;
+            // 上次为null,或者 此次的version比上次大  则进行更新
             if (lastSeenQuorumVerifier == null || (qv.getVersion() > lastSeenQuorumVerifier.getVersion()))
                 lastSeenQuorumVerifier = qv;
-
+            // 是否更新到disk
             if (writeToDisk) {
                 // some tests initialize QuorumPeer without a static config file
                 if (configFilename != null) {
@@ -1946,6 +1964,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
 
        // update last committed quorum verifier, write the new config to disk
        // and restart leader election if config changed.
+       // 更新last committed quorum verifier
        QuorumVerifier prevQV = setQuorumVerifier(qv, true);
 
        // There is no log record for the initial config, thus after syncing
@@ -1961,6 +1980,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
        if (prevQV.getVersion() < qv.getVersion() && !prevQV.equals(qv)) {
            Map<Long, QuorumServer> newMembers = qv.getAllMembers();
            updateRemotePeerMXBeans(newMembers);
+           // 重启leader选举
            if (restartLE) restartLeaderElection(prevQV, qv);
 
            QuorumServer myNewQS = newMembers.get(getId());

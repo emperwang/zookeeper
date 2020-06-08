@@ -249,6 +249,7 @@ public class Leader {
                     ss = new ServerSocket();
                 }
             }
+            // leader会创建一个serverSocket
             ss.setReuseAddress(true);
             if (!self.getQuorumListenOnAllIPs()) {
                 ss.bind(self.getQuorumAddress());
@@ -476,6 +477,7 @@ public class Leader {
 
             // Start thread that waits for connection requests from
             // new followers.
+            // 处理follower的请求
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
 
@@ -564,7 +566,9 @@ public class Leader {
                  }
                  return;
              }
-
+             // 1. sessionTracker 线程
+             // 2. sync 同步请求处理线程
+            // 3. container检测线程
              startZkServer();
              
             /**
@@ -654,6 +658,7 @@ public class Leader {
                     }
                     tickSkip = !tickSkip;
                 }
+                // 向所有注册的learner 发送ping packet
                 for (LearnerHandler f : getLearners()) {
                     f.ping();
                 }

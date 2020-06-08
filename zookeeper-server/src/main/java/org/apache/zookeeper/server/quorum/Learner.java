@@ -200,6 +200,7 @@ public class Learner {
         QuorumServer leaderServer = null;
         // Find the leader by id
         Vote current = self.getCurrentVote();
+        // 获取leader的地址
         for (QuorumServer s : self.getView().values()) {
             if (s.id == current.getId()) {
                 // Ensure we have the leader's correct IP address before
@@ -293,6 +294,7 @@ public class Learner {
         leaderIs = BinaryInputArchive.getArchive(new BufferedInputStream(
                 sock.getInputStream()));
         bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
+        // 创建输出流
         leaderOs = BinaryOutputArchive.getArchive(bufferedOutput);
     }
 
@@ -331,38 +333,46 @@ public class Learner {
         BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
         boa.writeRecord(li, "LearnerInfo");
         qp.setData(bsid.toByteArray());
-        
+        // 写数据
         writePacket(qp, true);
         readPacket(qp);        
         final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
 		if (qp.getType() == Leader.LEADERINFO) {
         	// we are connected to a 1.0 server so accept the new epoch and read the next packet
-        	leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
+        	// 获取leader发送的Epoch
+            leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
         	byte epochBytes[] = new byte[4];
         	final ByteBuffer wrappedEpochBytes = ByteBuffer.wrap(epochBytes);
+        	// 如果leader的epoch大于自己的,则更新
         	if (newEpoch > self.getAcceptedEpoch()) {
         		wrappedEpochBytes.putInt((int)self.getCurrentEpoch());
         		self.setAcceptedEpoch(newEpoch);
+        		// 相等,则
         	} else if (newEpoch == self.getAcceptedEpoch()) {
         		// since we have already acked an epoch equal to the leaders, we cannot ack
         		// again, but we still need to send our lastZxid to the leader so that we can
         		// sync with it if it does assume leadership of the epoch.
         		// the -1 indicates that this reply should not count as an ack for the new epoch
                 wrappedEpochBytes.putInt(-1);
+                // 如果leader 比 自己的小, 则报错
         	} else {
         		throw new IOException("Leaders epoch, " + newEpoch + " is less than accepted epoch, " + self.getAcceptedEpoch());
         	}
+        	// 创建响应的 packet , 回复给leader
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
         	writePacket(ackNewEpoch, true);
             return ZxidUtils.makeZxid(newEpoch, 0);
         } else {
+		    // 新的Epoch大于自己的,则更新
         	if (newEpoch > self.getAcceptedEpoch()) {
         		self.setAcceptedEpoch(newEpoch);
         	}
+        	// 如果不是 newleader,则报错
             if (qp.getType() != Leader.NEWLEADER) {
                 LOG.error("First packet should have been NEWLEADER");
                 throw new IOException("First packet should have been NEWLEADER");
             }
+            // 返回获取到的zxid
             return qp.getZxid();
         }
     } 

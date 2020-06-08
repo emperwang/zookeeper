@@ -37,6 +37,7 @@ import org.apache.zookeeper.data.StatPersisted;
  * array of ACLs, a stat object, and a set of its children's paths.
  * 
  */
+// 内存树中的每一个节点
 @SuppressFBWarnings("EI_EXPOSE_REP2")
 public class DataNode implements Record {
     /** the data for this datanode */

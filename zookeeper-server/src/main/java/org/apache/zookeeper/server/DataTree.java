@@ -83,6 +83,7 @@ public class DataTree {
      * This hashtable provides a fast lookup to the datanodes. The tree is the
      * source of truth and is where all the locking occurs
      */
+    // 此会存储内存中所有的节点
     private final ConcurrentHashMap<String, DataNode> nodes =
         new ConcurrentHashMap<String, DataNode>();
 
@@ -91,6 +92,7 @@ public class DataTree {
     private final WatchManager childWatches = new WatchManager();
 
     /** the root of zookeeper tree */
+    // 根节点
     private static final String rootZookeeper = "/";
 
     /** the zookeeper nodes that acts as the management and status node **/
@@ -229,12 +231,13 @@ public class DataTree {
         nodes.put(rootZookeeper, root);
 
         /** add the proc node and quota node */
+        // /zookeeper 虚拟节点的创建
         root.addChild(procChildZookeeper);
         nodes.put(procZookeeper, procDataNode);
-
+        // /zookeeper节点的子节点
         procDataNode.addChild(quotaChildZookeeper);
         nodes.put(quotaZookeeper, quotaDataNode);
-
+        // 自动配置, /zookeeper/config节点
         addConfigNode();
     }
 

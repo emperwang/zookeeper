@@ -318,6 +318,7 @@ public class NIOServerCnxn extends ServerCnxn {
 
                 return;
             }
+            // 如果数据可读,则输入数据到 buffer中
             if (k.isReadable()) {
                 int rc = sock.read(incomingBuffer);
                 if (rc < 0) {
@@ -347,6 +348,7 @@ public class NIOServerCnxn extends ServerCnxn {
                 }
             }
             if (k.isWritable()) {
+                // 写数据
                 handleWrite(k);
 
                 if (!initialized && !getReadInterest() && !getWriteInterest()) {

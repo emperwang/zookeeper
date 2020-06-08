@@ -89,19 +89,20 @@ public class FileTxnSnapLog {
      */
     public FileTxnSnapLog(File dataDir, File snapDir) throws IOException {
         LOG.debug("Opening datadir:{} snapDir:{}", dataDir, snapDir);
-
+        // 查看 dataDir(数据)   snapDir(快照)目录
         this.dataDir = new File(dataDir, version + VERSION);
         this.snapDir = new File(snapDir, version + VERSION);
 
         // by default create snap/log dirs, but otherwise complain instead
         // See ZOOKEEPER-1161 for more details
+        // 是否允许自动创建
         boolean enableAutocreate = Boolean.valueOf(
                 System.getProperty(ZOOKEEPER_DATADIR_AUTOCREATE,
                         ZOOKEEPER_DATADIR_AUTOCREATE_DEFAULT));
 
         trustEmptySnapshot = Boolean.getBoolean(ZOOKEEPER_SNAPSHOT_TRUST_EMPTY);
         LOG.info(ZOOKEEPER_SNAPSHOT_TRUST_EMPTY + " : " + trustEmptySnapshot);
-
+        // 如果目录不存在,也不允许自动创建 则报错
         if (!this.dataDir.exists()) {
             if (!enableAutocreate) {
                 throw new DatadirException("Missing data directory "
@@ -110,16 +111,17 @@ public class FileTxnSnapLog {
                         + ZOOKEEPER_DATADIR_AUTOCREATE
                         + " is false). Please create this directory manually.");
             }
-
+            // 允许创建,但创建失败,则报错
             if (!this.dataDir.mkdirs()) {
                 throw new DatadirException("Unable to create data directory "
                         + this.dataDir);
             }
         }
+        // 不可写 则报错
         if (!this.dataDir.canWrite()) {
             throw new DatadirException("Cannot write to data directory " + this.dataDir);
         }
-
+        // 快照目录 不存在,也不允许自动创建,则报错
         if (!this.snapDir.exists()) {
             // by default create this directory, but otherwise complain instead
             // See ZOOKEEPER-1161 for more details
@@ -130,12 +132,13 @@ public class FileTxnSnapLog {
                         + ZOOKEEPER_DATADIR_AUTOCREATE
                         + " is false). Please create this directory manually.");
             }
-
+            // 创建失败,则报错
             if (!this.snapDir.mkdirs()) {
                 throw new DatadirException("Unable to create snap directory "
                         + this.snapDir);
             }
         }
+        // 不可写  则报错
         if (!this.snapDir.canWrite()) {
             throw new DatadirException("Cannot write to snap directory " + this.snapDir);
         }
@@ -146,7 +149,7 @@ public class FileTxnSnapLog {
             checkLogDir();
             checkSnapDir();
         }
-
+        // 记录文件 对象 file
         txnLog = new FileTxnLog(this.dataDir);
         snapLog = new FileSnap(this.snapDir);
     }
