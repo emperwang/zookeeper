@@ -43,7 +43,8 @@ public class SyncedLearnerTracker {
         }
         return change;
     }
-
+    // 这里查看是否有server的得票数 超过半数的
+    // 半数 机制就在这里对比了
     public boolean hasAllQuorums() {
         for (QuorumVerifierAcksetPair qvAckset : qvAcksetPairs) {
             if (!qvAckset.getQuorumVerifier().containsQuorum(qvAckset.getAckset()))

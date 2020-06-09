@@ -672,10 +672,13 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         @Override
         public void run() {
             try {
+                // 保存响应数据的缓存
                 byte b[] = new byte[36];
+                // 包装到buteBuffer
                 ByteBuffer responseBuffer = ByteBuffer.wrap(b);
                 DatagramPacket packet = new DatagramPacket(b, b.length);
                 while (running) {
+                    // 接收其他server 发送的packet
                     udpSocket.receive(packet);
                     if (packet.getLength() != 4) {
                         LOG.warn("Got more than just an xid! Len = "
@@ -683,8 +686,11 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                     } else {
                         responseBuffer.clear();
                         responseBuffer.getInt(); // Skip the xid
+                        // 把自己的myid放入
                         responseBuffer.putLong(myid);
+                        // 获取到自己当前的选票
                         Vote current = getCurrentVote();
+                        // 根据自己当前的状态来填充响应
                         switch (getPeerState()) {
                         case LOOKING:
                             responseBuffer.putLong(current.getId());
@@ -713,10 +719,12 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                             }
                             break;
                         case OBSERVING:
+                            // 如果是observing  则没有响应
                             // Do nothing, Observers keep themselves to
                             // themselves.
                             break;
                         }
+                        // 填充的数据发送出去
                         packet.setData(b);
                         udpSocket.send(packet);
                     }
@@ -912,6 +920,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
          }
         // 加载磁盘数据
         loadDataBase();
+        // selector 接收客户端请求 并进行处理
+        // 一个selector 多个worker 和 netty 很像
         startServerCnxnFactory();
         try {
             adminServer.start();
@@ -922,6 +932,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         // 开始leader选举前的准备
         startLeaderElection();
         // 开始选举
+        // 注意 QuorumPeer 也就是本class 也是一个线程
+        // 也就是说,此处的start会运行本类的run方法
         super.start();
     }
 
@@ -1118,11 +1130,15 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 oldQcm.halt();
             }
             // 启动listener 处理连接请求
+            // 此listener是处理选票 以及 通知等信息, 也就是信息都是server之间的
+            // 但是当myid比较小 去 连接myid比较大的server时, 此listener会进行判断,小于自己的myid的连接,会关闭
+            // 如果连接的myid 不小于自己,那么就根据 接收的socket创建 接收和发送线程 来进行交互
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
                 listener.start();
                 // 快速leader选举
                 FastLeaderElection fle = new FastLeaderElection(this, qcm);
+                // leader选举开始
                 fle.start();
                 le = fle;
             } else {
@@ -1170,6 +1186,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     
     @Override
     public void run() {
+        // 重新设置一下线程的名字
         updateThreadName();
 
         LOG.debug("Starting quorum peer");
@@ -1814,6 +1831,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
 
     private void startServerCnxnFactory() {
+        // 此主要是 selector 处理接收,也就是客户端的连接请求处理
         if (cnxnFactory != null) {
             cnxnFactory.start();
         }

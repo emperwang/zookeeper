@@ -135,6 +135,7 @@ public class QuorumCnxManager {
     /*
      * Mapping from Peer to Thread number
      */
+    // 每一个 sid 对应色 sendWorker
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
     // 每一个sid对应一个队列; 队列中的数据为要发送的数据
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
@@ -143,6 +144,7 @@ public class QuorumCnxManager {
     /*
      * Reception queue
      */
+    // 存储RecvWorker 接收的数据
     public final ArrayBlockingQueue<Message> recvQueue;
     /*
      * Object to synchronize access to recvQueue
@@ -458,9 +460,9 @@ public class QuorumCnxManager {
             if(vsw != null)
                 // 有则进行关闭
                 vsw.finish();
-            // 把新创建的发送线程, 存储
+            // 把新创建的发送线程, 存储; key为对端的myid, value为发送线程
             senderWorkerMap.put(sid, sw);
-            // 创建并记录  发送队列
+            // 创建并记录  发送队列; 创建一个sid对应的发送队列
             queueSendMap.putIfAbsent(sid, new ArrayBlockingQueue<ByteBuffer>(
                     SEND_CAPACITY));
             // 启动发送 接收线程
@@ -486,7 +488,7 @@ public class QuorumCnxManager {
             // 获取输入流
             din = new DataInputStream(
                     new BufferedInputStream(sock.getInputStream()));
-
+            // 处理连接
             handleConnection(sock, din);
         } catch (IOException e) {
             LOG.error("Exception handling connection, addr: {}, closing server connection",
@@ -538,6 +540,7 @@ public class QuorumCnxManager {
                 sid = protocolVersion;
             } else {
                 try {
+                    // 从输入流中读取 sid 以及 选举地址
                     InitialMessage init = InitialMessage.parse(protocolVersion, din);
                     sid = init.sid;
                     // 选举地址
@@ -585,8 +588,14 @@ public class QuorumCnxManager {
             LOG.debug("Create new connection to server: {}", sid);
             // 关闭
             closeSocket(sock);
-
+            // todo 创建连接, 用于server之间的 leader选举  信息广播
+            // server之间的连接  用于同步 leader 选举
             if (electionAddr != null) {
+                // 连接创建好,就会立即发送一些信息过去, 信息:
+                // 1. PROTOCOL_VERSION
+                // 2. myid
+                // 3. 自己的选举地址的长度
+                // 4. 自己的选举地址
                 connectOne(sid, electionAddr);
             } else {
                 connectOne(sid);
@@ -594,6 +603,9 @@ public class QuorumCnxManager {
 
         } else { // Otherwise start worker threads to receive data.
             // 如果对端的 myid大, 则创建接收  发送线程 来进行具体的发送  接收操作
+            // 那换句话说, myid小的去进行连接操作后, myid大的会进行关闭
+            // 那什么时候建立了连接呢?
+            // 由此可见连接建立时延后的, 分析下来,是需要发送数据时,才会进行连接的建立
             SendWorker sw = new SendWorker(sock, sid);
             RecvWorker rw = new RecvWorker(sock, din, sid, sw);
             sw.setRecv(rw);
@@ -642,6 +654,7 @@ public class QuorumCnxManager {
                  addToSendQueue(bq, b);
              }
              // 连接 sid对应的server
+            // 这说明 开始进行选举时,才进行了连接操作
              connectOne(sid);
 
         }
@@ -942,6 +955,7 @@ public class QuorumCnxManager {
                     // 设置线程名字
                     setName(addr.toString());
                     // 绑定地址
+                    // todo 查看此处的地址是什么???
                     ss.bind(addr);
                     while (!shutdown) {
                         try {
