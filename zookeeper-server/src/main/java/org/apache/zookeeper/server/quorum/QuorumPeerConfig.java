@@ -63,7 +63,7 @@ public class QuorumPeerConfig {
 
     private static boolean standaloneEnabled = true;
     private static boolean reconfigEnabled = false;
-
+    // 此clientPortAddress地址记录 客户端登录zk时的地址
     protected InetSocketAddress clientPortAddress;
     protected InetSocketAddress secureClientPortAddress;
     protected boolean sslQuorum = false;
@@ -87,9 +87,9 @@ public class QuorumPeerConfig {
     protected int electionAlg = 3;
     protected int electionPort = 2182;
     protected boolean quorumListenOnAllIPs = false;
-
+    // 记录自己的sid
     protected long serverId = UNSET_SERVERID;
-
+    // 此quorumVerifier保存了集群中所有server的信息
     protected QuorumVerifier quorumVerifier = null, lastSeenQuorumVerifier = null;
     protected int snapRetainCount = 3;
     protected int purgeInterval = 0;
@@ -133,15 +133,18 @@ public class QuorumPeerConfig {
         LOG.info("Reading configuration from: " + path);
        
         try {
+            // 首先对配置文件的校验
             File configFile = (new VerifyingFileFactory.Builder(LOG)
-                .warnForRelativePath()
-                .failForNonExistingPath()
-                .build()).create(path);
+                .warnForRelativePath()  // 如果是相对路径,则警告
+                .failForNonExistingPath()   // 文件不存在,则失败
+                .build()).create(path); // 创建文件
             // 按照 properties 来加载
             Properties cfg = new Properties();
             FileInputStream in = new FileInputStream(configFile);
             try {
+                // properties加载配置文件
                 cfg.load(in);
+                // 记录配置文件路径
                 configFileStr = path;
             } finally {
                 in.close();
@@ -153,7 +156,7 @@ public class QuorumPeerConfig {
         } catch (IllegalArgumentException e) {
             throw new ConfigException("Error processing " + path, e);
         }   
-        
+        // 动态配置
         if (dynamicConfigFileStr!=null) {
            try {           
                Properties dynamicCfg = new Properties();
@@ -338,13 +341,14 @@ public class QuorumPeerConfig {
                 System.setProperty("zookeeper." + key, value);
             }
         }
-
+        // 没有使能Sasl(quorum.auth.enableSasl),但是设置了 quorum.auth.serverRequireSasl为true,包报错
         if (!quorumEnableSasl && quorumServerRequireSasl) {
             throw new IllegalArgumentException(
                     QuorumAuth.QUORUM_SASL_AUTH_ENABLED
                             + " is disabled, so cannot enable "
                             + QuorumAuth.QUORUM_SERVER_SASL_AUTH_REQUIRED);
         }
+        // quorum.auth.enableSasl为false, quorum.auth.learnerRequireSasl为true, 报错
         if (!quorumEnableSasl && quorumLearnerRequireSasl) {
             throw new IllegalArgumentException(
                     QuorumAuth.QUORUM_SASL_AUTH_ENABLED
@@ -354,6 +358,7 @@ public class QuorumPeerConfig {
         // If quorumpeer learner is not auth enabled then self won't be able to
         // join quorum. So this condition is ensuring that the quorumpeer learner
         // is also auth enabled while enabling quorum server require sasl.
+        // quorum.auth.serverRequireSasl为false,quorum.auth.learnerRequireSasl为true 报错
         if (!quorumLearnerRequireSasl && quorumServerRequireSasl) {
             throw new IllegalArgumentException(
                     QuorumAuth.QUORUM_LEARNER_SASL_AUTH_REQUIRED
@@ -364,33 +369,36 @@ public class QuorumPeerConfig {
         // Reset to MIN_SNAP_RETAIN_COUNT if invalid (less than 3)
         // PurgeTxnLog.purge(File, File, int) will not allow to purge less
         // than 3.
+        // 快照数量最少为3
         if (snapRetainCount < MIN_SNAP_RETAIN_COUNT) {
             LOG.warn("Invalid autopurge.snapRetainCount: " + snapRetainCount
                     + ". Defaulting to " + MIN_SNAP_RETAIN_COUNT);
             snapRetainCount = MIN_SNAP_RETAIN_COUNT;
         }
-
+        // 没有设置 data目录,则报错
         if (dataDir == null) {
             throw new IllegalArgumentException("dataDir is not set");
         }
         if (dataLogDir == null) {
             dataLogDir = dataDir;
         }
-
+        // clientPort必须设置
         if (clientPort == 0) {
             LOG.info("clientPort is not set");
             if (clientPortAddress != null) {
                 throw new IllegalArgumentException("clientPortAddress is set but clientPort is not set");
             }
+            // 创建ClientAddress
         } else if (clientPortAddress != null) {
             this.clientPortAddress = new InetSocketAddress(
                     InetAddress.getByName(clientPortAddress), clientPort);
             LOG.info("clientPortAddress is {}", this.clientPortAddress.toString());
         } else {
+            // clientPortAddress 客户端地址,使用配置的clientPort创建地址
             this.clientPortAddress = new InetSocketAddress(clientPort);
             LOG.info("clientPortAddress is {}", this.clientPortAddress.toString());
         }
-
+        // secure 的设置
         if (secureClientPort == 0) {
             LOG.info("secureClientPort is not set");
             if (secureClientPortAddress != null) {
@@ -423,6 +431,7 @@ public class QuorumPeerConfig {
         // backward compatibility - dynamic configuration in the same file as
         // static configuration params see writeDynamicConfig()
         if (dynamicConfigFileStr == null) {
+            // 设置 zookeeper的集群信息
             setupQuorumPeerConfig(zkProp, true);
             if (isDistributed() && isReconfigEnabled()) {
                 // we don't backup static config for standalone mode.
@@ -599,6 +608,7 @@ public class QuorumPeerConfig {
              */        
             //LOG.info("Defaulting to majority quorums");
            // 解析集群中其他节点的地址
+           // 根据配置文件创建所有的server,并解析各个server对应的sid 地址等配置信息
             return new QuorumMaj(dynamicConfigProp);            
         }          
     }
@@ -636,11 +646,13 @@ public class QuorumPeerConfig {
                throw new ConfigException("Unrecognised parameter: " + key);                
             }
         }
-        // 创建
+        // 创建; 此QuorumVerifier qv 保存了所有server的信息
         QuorumVerifier qv = createQuorumVerifier(dynamicConfigProp, isHierarchical);
-               
+        // 获取具有投票权的 server个数
         int numParticipators = qv.getVotingMembers().size();
+        // 获取 observer角色的 server个数
         int numObservers = qv.getObservingMembers().size();
+        // 健康性检测
         if (numParticipators == 0) {
             if (!standaloneEnabled) {
                 throw new IllegalArgumentException("standaloneEnabled = false then " +
@@ -671,7 +683,7 @@ public class QuorumPeerConfig {
              * If using FLE, then every server requires a separate election
              * port.
              */            
-           if (eAlg != 0) {
+           if (eAlg != 0) { // 如果设置了选举算法,那么各个server的选举地址如果为null,则报错
                for (QuorumServer s : qv.getVotingMembers().values()) {
                    if (s.electionAddr == null)
                        throw new IllegalArgumentException(
@@ -691,12 +703,15 @@ public class QuorumPeerConfig {
         BufferedReader br = new BufferedReader(new FileReader(myIdFile));
         String myIdString;
         try {
+            // 读取 sid
             myIdString = br.readLine();
         } finally {
             br.close();
         }
         try {
+            //  记录sid
             serverId = Long.parseLong(myIdString);
+            // sl4j的配置相关
             MDC.put("myid", myIdString);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("serverid " + myIdString
@@ -800,7 +815,8 @@ public class QuorumPeerConfig {
     }
 
     public long getServerId() { return serverId; }
-
+    // 是否是分布式,条件:
+    // quorumVerifier存在  &&  (!standaloneEnabled模式 || quorumVerifier中具有投票数的server数量大于1)
     public boolean isDistributed() {
         return quorumVerifier!=null && (!standaloneEnabled || quorumVerifier.getVotingMembers().size() > 1);
     }

@@ -75,7 +75,7 @@ public class Observer extends Learner{
                 // 和leader进行同步
                 syncWithLeader(newLeaderZxid);
                 QuorumPacket qp = new QuorumPacket();
-                while (this.isRunning()) {
+                while (this.isRunning()) {      // 阻塞在这里 一直和leader进行数据的同步
                     readPacket(qp);
                     processPacket(qp);
                 }

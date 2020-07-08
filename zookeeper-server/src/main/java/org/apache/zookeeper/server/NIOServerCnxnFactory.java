@@ -301,8 +301,9 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory {
                 accepted = true;
                 // 对端地址
                 InetAddress ia = sc.socket().getInetAddress();
+                // 获取此ip已经连接的数量
                 int cnxncount = getClientCnxnCount(ia);
-
+                // 如果超过最大连接数,则 报错
                 if (maxClientCnxns > 0 && cnxncount >= maxClientCnxns){
                     throw new IOException("Too many connections from " + ia
                                           + " - max is " + maxClientCnxns );
@@ -640,6 +641,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory {
     private final ConcurrentHashMap<Long, NIOServerCnxn> sessionMap =
         new ConcurrentHashMap<Long, NIOServerCnxn>();
     // ipMap is used to limit connections per IP
+    // 此ipMap用来 限制 一个ip同时连接的数量
     private final ConcurrentHashMap<InetAddress, Set<NIOServerCnxn>> ipMap =
         new ConcurrentHashMap<InetAddress, Set<NIOServerCnxn>>( );
 
@@ -690,7 +692,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory {
             new ExpiryQueue<NIOServerCnxn>(sessionlessCnxnTimeout);
         // 超时处理线程; 操作就是进行关闭
         expirerThread = new ConnectionExpirerThread();
-
+        // cpu核数
         int numCores = Runtime.getRuntime().availableProcessors();
         // 32 cores sweet spot seems to be 4 selector threads
         // selector的线程数量
@@ -782,10 +784,11 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory {
         stopped = false;
         if (workerPool == null) {
             // 初始化 workerPool
+            // 具体处理接收到的读写事件的 线程池
             workerPool = new WorkerService(
                 "NIOWorker", numWorkerThreads, false);
         }
-        // 开启工作线程
+        // 开启工作线程; 真正的线程启动操作  selector
         for(SelectorThread thread : selectorThreads) {
             if (thread.getState() == Thread.State.NEW) {
                 thread.start();

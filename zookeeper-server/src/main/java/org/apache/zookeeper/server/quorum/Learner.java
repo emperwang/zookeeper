@@ -78,7 +78,7 @@ public class Learner {
     public Socket getSocket() {
         return sock;
     }
-    
+    // 和leader进行数据同步时的 socket io流
     protected InputArchive leaderIs;
     protected OutputArchive leaderOs;  
     /** the protocol version of the leader */
@@ -646,7 +646,7 @@ public class Learner {
                     + " is valid: " + valid);
         }
     }
-        
+    // ping消息 返回 session Data
     protected void ping(QuorumPacket qp) throws IOException {
         // Send back the ping with our session data
         ByteArrayOutputStream bos = new ByteArrayOutputStream();

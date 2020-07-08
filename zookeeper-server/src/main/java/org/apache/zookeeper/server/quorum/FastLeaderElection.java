@@ -765,6 +765,7 @@ public class FastLeaderElection implements Election {
      *            Identifier of the vote received last
      */
     protected boolean termPredicate(Map<Long, Vote> votes, Vote vote) {
+        // SyncedLearnerTracker此相当于一个工具类  用于判断是否有 选票过半数
         SyncedLearnerTracker voteSet = new SyncedLearnerTracker();
         voteSet.addQuorumVerifier(self.getQuorumVerifier());
         if (self.getLastSeenQuorumVerifier() != null
@@ -898,6 +899,7 @@ public class FastLeaderElection implements Election {
      * changes its state to LOOKING, this method is invoked, and it
      * sends notifications to all other peers.
      */
+    // leader选举
     public Vote lookForLeader() throws InterruptedException {
         try {
             // jmx
@@ -912,7 +914,7 @@ public class FastLeaderElection implements Election {
            self.start_fle = Time.currentElapsedTime();
         }
         try {
-            // 记录  状态为LOOKING的server 投票
+            // 记录 接收到的 选票
             HashMap<Long, Vote> recvset = new HashMap<Long, Vote>();
             // 记录 状态 不为 LOOKING OBServing 状态的投票
             HashMap<Long, Vote> outofelection = new HashMap<Long, Vote>();
@@ -984,7 +986,7 @@ public class FastLeaderElection implements Election {
                         // 此条件为真  则选票有效
                         if (n.electionEpoch > logicalclock.get()) {
                             logicalclock.set(n.electionEpoch);
-                            //
+                            // 容器清空
                             recvset.clear();
                             // totalOrderPredicate选票竞选的方法
                             if(totalOrderPredicate(n.leader, n.zxid, n.peerEpoch,

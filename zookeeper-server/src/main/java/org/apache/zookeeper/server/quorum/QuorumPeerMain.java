@@ -114,22 +114,24 @@ public class QuorumPeerMain {
         QuorumPeerConfig config = new QuorumPeerConfig();
         if (args.length == 1) {
             // 配置文件解析
+            // 创建server机器信息
             config.parse(args[0]);
         }
 
         // Start and schedule the the purge task
-        // 数据清理线程
+        // 数据清理线程  snap 快照清理
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(config
                 .getDataDir(), config.getDataLogDir(), config
                 .getSnapRetainCount(), config.getPurgeInterval());
         purgeMgr.start();
-
+        // 集群模式
         if (args.length == 1 && config.isDistributed()) {
             runFromConfig(config);
         } else {
             LOG.warn("Either no config or no quorum defined in config, running "
                     + " in standalone mode");
             // there is only server in the quorum -- run as standalone
+            // standalone模式的启动
             ZooKeeperServerMain.main(args);
         }
     }
@@ -138,7 +140,7 @@ public class QuorumPeerMain {
             throws IOException, AdminServerException
     {
       try {
-          // jmx
+          // jmx  log4j
           ManagedUtil.registerLog4jMBeans();
       } catch (JMException e) {
           LOG.warn("Unable to register log4j JMX control", e);
@@ -148,16 +150,17 @@ public class QuorumPeerMain {
       try {
           ServerCnxnFactory cnxnFactory = null;
           ServerCnxnFactory secureCnxnFactory = null;
-
+            // getClientPortAddress 获取客户端登录时的地址
           if (config.getClientPortAddress() != null) {
               // 通过反射创建NIOServerCnxnFactory, NIO 通信
               cnxnFactory = ServerCnxnFactory.createFactory();
               // 创建 NioServerSocket 以及 worker处理IO的线程
+              // 对NioServer进行一些配置
               cnxnFactory.configure(config.getClientPortAddress(),
                       config.getMaxClientCnxns(),
                       false);
           }
-
+            // ssl
           if (config.getSecureClientPortAddress() != null) {
               secureCnxnFactory = ServerCnxnFactory.createFactory();
               secureCnxnFactory.configure(config.getSecureClientPortAddress(),
@@ -175,6 +178,7 @@ public class QuorumPeerMain {
               config.isLocalSessionsUpgradingEnabled());
           //quorumPeer.setQuorumPeers(config.getAllMembers());
           // 选举算法
+          // ElectionType 记录了具体的选举方式,也就是指定了选举算法
           quorumPeer.setElectionType(config.getElectionAlg());
           quorumPeer.setMyid(config.getServerId());
           quorumPeer.setTickTime(config.getTickTime());
@@ -187,6 +191,7 @@ public class QuorumPeerMain {
           // 此处就是创建 内存中的数据树
           quorumPeer.setZKDatabase(new ZKDatabase(quorumPeer.getTxnFactory()));
           // getQuorumVerifier此属性很重要,记录了集群中的其他节点的信息,以及各个节点的角色
+          // 使用AddressTuple 记录地址
           quorumPeer.setQuorumVerifier(config.getQuorumVerifier(), false);
           if (config.getLastSeenQuorumVerifier()!=null) {
               quorumPeer.setLastSeenQuorumVerifier(config.getLastSeenQuorumVerifier(), false);
@@ -215,8 +220,9 @@ public class QuorumPeerMain {
           quorumPeer.setQuorumCnxnThreadsSize(config.quorumCnxnThreadsSize);
           // auth相关的配置
           quorumPeer.initialize();
-          //
+          // 启动
           quorumPeer.start();
+          // 等待线程结束
           quorumPeer.join();
       } catch (InterruptedException e) {
           // warn, but generally this is ok

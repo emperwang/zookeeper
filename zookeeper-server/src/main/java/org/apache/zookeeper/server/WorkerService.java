@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class WorkerService {
     private static final Logger LOG =
         LoggerFactory.getLogger(WorkerService.class);
-
+    // 多个线程池的列表
     private final ArrayList<ExecutorService> workers =
         new ArrayList<ExecutorService>();
 

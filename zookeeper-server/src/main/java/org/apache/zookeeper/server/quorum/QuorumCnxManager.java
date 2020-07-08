@@ -93,7 +93,7 @@ public class QuorumCnxManager {
     /*
      * Negative counter for observer server ids.
      */
-
+    // 观察者的数量
     private AtomicLong observerCounter = new AtomicLong(-1);
 
     /*
@@ -139,6 +139,7 @@ public class QuorumCnxManager {
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
     // 每一个sid对应一个队列; 队列中的数据为要发送的数据
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
+    // key为sid,Bytebuffer为上次发送的数据
     final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent;
 
     /*
@@ -535,6 +536,7 @@ public class QuorumCnxManager {
         InetSocketAddress electionAddr = null;
 
         try {
+            // 协议 版本
             protocolVersion = din.readLong();
             if (protocolVersion >= 0) { // this is a server id and not a protocol version
                 sid = protocolVersion;
@@ -684,6 +686,8 @@ public class QuorumCnxManager {
                  LOG.info("SSL handshake complete with {} - {} - {}", sslSock.getRemoteSocketAddress(), sslSock.getSession().getProtocol(), sslSock.getSession().getCipherSuite());
              } else {
                  sock = new Socket();
+                 // 设置TCPKeepalived
+                // 设置获取数据超时时间
                  setSockOpts(sock);
                  // 连接,并设置超时时间
                  sock.connect(electionAddr, cnxTO);
@@ -836,6 +840,7 @@ public class QuorumCnxManager {
     private void setSockOpts(Socket sock) throws SocketException {
         sock.setTcpNoDelay(true);
         sock.setKeepAlive(tcpKeepAlive);
+        // 设置获取数据超时时间
         sock.setSoTimeout(self.tickTime * self.syncLimit);
     }
 
@@ -954,8 +959,8 @@ public class QuorumCnxManager {
                     LOG.info("My election bind port: " + addr.toString());
                     // 设置线程名字
                     setName(addr.toString());
-                    // 绑定地址
-                    // todo 查看此处的地址是什么???
+                    // server.1=name1:2888:3888
+                    // 绑定选举地址,地址 name:3888
                     ss.bind(addr);
                     while (!shutdown) {
                         try {
@@ -1154,8 +1159,11 @@ public class QuorumCnxManager {
                  * stale message, we should send the message in the send queue.
                  */
                 ArrayBlockingQueue<ByteBuffer> bq = queueSendMap.get(sid);
+                // 如果发送队列为空
                 if (bq == null || isSendQueueEmpty(bq)) {
+                    // 获取上次发送的数据
                    ByteBuffer b = lastMessageSent.get(sid);
+                   // 如果上次发送的数据不为空,则把上次发送的数据发送
                    if (b != null) {
                        LOG.debug("Attempting to send lastMessage to sid=" + sid);
                        send(b);
@@ -1228,6 +1236,7 @@ public class QuorumCnxManager {
             this.din = din;
             try {
                 // OK to wait until socket disconnects while reading.
+                // 数据读取 一直等待,不超时
                 sock.setSoTimeout(0);
             } catch (IOException e) {
                 LOG.error("Error while accessing socket for " + sid, e);

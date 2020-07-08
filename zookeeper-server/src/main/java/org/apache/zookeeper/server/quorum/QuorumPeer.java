@@ -133,25 +133,30 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         public final InetSocketAddress clientAddr;
 
         public AddressTuple(InetSocketAddress quorumAddr, InetSocketAddress electionAddr, InetSocketAddress clientAddr) {
+            // 通信地址 server.1=name1:2888:3888
+            // 此quorumAddr为name1:2888
             this.quorumAddr = quorumAddr;
+            // 此electionAddr为name1:3888
             this.electionAddr = electionAddr;
             this.clientAddr = clientAddr;
         }
     }
 
     public static class QuorumServer {
+        // server间通信地址
+        //server.1=name2:2888:3888, 此addr=name2:2888
         public InetSocketAddress addr = null;
-
+        // 选举地址 此地址为   name2:3888
         public InetSocketAddress electionAddr = null;
         
         public InetSocketAddress clientAddr = null;
-        
+        // 此server的sid
         public long id;
-
+        // 此server的host地址
         public String hostname;
-        
+        // server创建时,默认的角色
         public LearnerType type = LearnerType.PARTICIPANT;
-        
+        // 记录解析到的地址,此地址中不包括自己的地址
         private List<InetSocketAddress> myAddrs;
 
         public QuorumServer(long id, InetSocketAddress addr,
@@ -217,6 +222,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 throws ConfigException
         {
             /* Does it start with an IPv6 literal? */
+            // ipv6地址的分析
             if (s.startsWith("[")) {
                 int i = s.indexOf("]:");
                 if (i < 0) {
@@ -230,6 +236,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
 
                 return nsa;
             } else {
+                // 普通地址 使用 : 分隔
                 return s.split(":");
             }
         }
@@ -245,8 +252,12 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             // 记录此server对应的myid
             this.id = sid;
             // 解析地址
+            // 由此可见,当配置多个地址时,使用 ; 分割
             String serverClientParts[] = addressStr.split(";");
+            // 多个地址 也会先使用第一个
             String serverParts[] = splitWithLeadingHostname(serverClientParts[0]);
+            // 可见使用多个地址不能大于2
+            // 地址的格式不正确也会报错
             if ((serverClientParts.length > 2) || (serverParts.length < 3)
                     || (serverParts.length > 4)) {
                 throw new ConfigException(addressStr + wrongFormat);
@@ -262,6 +273,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 // is client_config a host:port or just a port
                 hostname = (clientParts.length == 2) ? clientParts[0] : "0.0.0.0";
                 try {
+                    // client地址 todo  不是很清楚此clientAddr的作用
                     clientAddr = new InetSocketAddress(hostname,
                             Integer.parseInt(clientParts[clientParts.length - 1]));
                     //LOG.warn("Set clientAddr to " + clientAddr);
@@ -272,28 +284,32 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
 
             // server_config should be either host:port:port or host:port:port:type
             try {
+                //server.1=name2:2888:3888, 此addr=name2:2888
                 addr = new InetSocketAddress(serverParts[0],
                         Integer.parseInt(serverParts[1]));
             } catch (NumberFormatException e) {
                 throw new ConfigException("Address unresolved: " + serverParts[0] + ":" + serverParts[1]);
             }
             try {
-                // 选举地址
+                // 选举地址 server.1=name2:2888:3888, 此addr=name2:3888
                 electionAddr = new InetSocketAddress(serverParts[0],
                         Integer.parseInt(serverParts[2]));
             } catch (NumberFormatException e) {
                 throw new ConfigException("Address unresolved: " + serverParts[0] + ":" + serverParts[2]);
             }
-
+            // 通信端口和 选举端口一样,则报错
             if(addr.getPort() == electionAddr.getPort()) {
                 throw new ConfigException(
                         "Client and election port must be different! Please update the configuration file on server." + sid);
             }
             // 类型, observer follower角色
+            // 可见,有此配置 server.1=name2:2888:3888:observer
+            // 可见,有此配置 server.1=name2:2888:3888:participant
+            // 间接设置 角色
             if (serverParts.length == 4) {
                 setType(serverParts[3]);
             }
-
+            // 此server的地址
             this.hostname = serverParts[0];
             // 把解析的地址记录起来, 并去除自己的地址
             setMyAddrs();
@@ -398,22 +414,29 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         }
 
         private List<InetSocketAddress> excludedSpecialAddresses(List<InetSocketAddress> addrs) {
+            // 记录最终的有效地址
             List<InetSocketAddress> included = new ArrayList<InetSocketAddress>();
+            // 获取本地的地址
             InetAddress wcAddr = new InetSocketAddress(0).getAddress();
-
+            // 遍历传递进来的所有地址, 来判断获取最终的有效地址
             for (InetSocketAddress addr : addrs) {
+                // 跳过地址为空的
                 if (addr == null) {
                     continue;
                 }
                 InetAddress inetaddr = addr.getAddress();
-
+                // 地址为空 跳过
+                // 地址等于自己的本地地址  跳过
+                // 是 loopback地址, 跳过
                 if (inetaddr == null ||
                     inetaddr.equals(wcAddr) || // wildCard address(0.0.0.0)
                     inetaddr.isLoopbackAddress()) { // loopback address(localhost/127.0.0.1)
                     continue;
                 }
+                // 记录有效地址
                 included.add(addr);
             }
+            // 最终返回所有的有效地址
             return included;
         }
     }
@@ -739,7 +762,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             }
         }
     }
-
+    // 初始状态为 LOOKING
     private ServerState state = ServerState.LOOKING;
     
     private boolean reconfigFlag = false; // indicates that a reconfig just committed
@@ -849,12 +872,13 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
 
     public QuorumPeer() throws SaslException {
-        super("QuorumPeer");
+        super("QuorumPeer");    // 设置线程的名字
         quorumStats = new QuorumStats(this);
         jmxRemotePeerBean = new HashMap<Long, RemotePeerBean>();
         // 反射创建org.apache.zookeeper.server.admin.JettyAdminServer
         adminServer = AdminServerFactory.createAdminServer();
         x509Util = new QuorumX509Util();
+        // ssl相关的初始化
         initialize();
     }
 
@@ -945,6 +969,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             long lastProcessedZxid = zkDb.getDataTree().lastProcessedZxid;
             long epochOfZxid = ZxidUtils.getEpochFromZxid(lastProcessedZxid);
             try {
+                // 从文件中读取
                 currentEpoch = readLongFromFile(CURRENT_EPOCH_FILENAME);
             } catch(FileNotFoundException e) {
             	// pick a reasonable epoch number
@@ -1140,6 +1165,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 FastLeaderElection fle = new FastLeaderElection(this, qcm);
                 // leader选举开始
                 fle.start();
+                // 记录选举算法
                 le = fle;
             } else {
                 LOG.error("Null listener when initializing cnx manager");
@@ -1242,6 +1268,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         // Thread is used here because otherwise it would require
                         // changes in each of election strategy classes which is
                         // unnecessary code coupling.
+                        // 只读模式的启动
                         Thread roZkMgr = new Thread() {
                             public void run() {
                                 try {
@@ -1721,6 +1748,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             }
             QuorumServer qs = qv.getAllMembers().get(getId());
             if (qs != null) {
+                // 记录自己的地址
                 setAddrs(qs.addr, qs.electionAddr, qs.clientAddr);
             }
             return prevQV;
@@ -2243,10 +2271,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     public QuorumCnxManager createCnxnManager() {
         return new QuorumCnxManager(this,
                 this.getId(),
-                this.getView(),
+                this.getView(), // 此view 记录了所有的server
                 this.authServer,
                 this.authLearner,
-                this.tickTime * this.syncLimit,
+                this.tickTime * this.syncLimit, // socketTimeou的设置
                 this.getQuorumListenOnAllIPs(),
                 this.quorumCnxnThreadsSize,
                 this.isQuorumSaslAuthEnabled());

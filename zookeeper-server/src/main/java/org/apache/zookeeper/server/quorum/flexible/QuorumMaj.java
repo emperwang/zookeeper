@@ -34,8 +34,11 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
  * 
  */
 public class QuorumMaj implements QuorumVerifier {
+    // allMembers 记录集群中的各个server
     private Map<Long, QuorumServer> allMembers = new HashMap<Long, QuorumServer>();
+    // 具有投票权的server,也就是角色不是 Observer的
     private HashMap<Long, QuorumServer> votingMembers = new HashMap<Long, QuorumServer>();
+    // 记录集群中的 角色为 Observer的server
     private HashMap<Long, QuorumServer> observingMembers = new HashMap<Long, QuorumServer>();
     private long version = 0;
     private int half;
@@ -85,9 +88,14 @@ public class QuorumMaj implements QuorumVerifier {
 
             if (key.startsWith("server.")) {
                 int dot = key.indexOf('.');
+                // 解析sid
                 long sid = Long.parseLong(key.substring(dot + 1));
-                // 看到此处的记录,每一个server对应一条记录; key为myid, value为QuorumServer
+                // server.1=name2:2888:3888
+                // 看到此处的记录,每一个server对应一条记录; key为myid, value为QuorumServer的地址以及通信和选票的端口
+                // 此处会根据 配置,创建多个server
+                // 创建QuorumServer 时会解析此server的sid 地址等信息,并保存起来
                 QuorumServer qs = new QuorumServer(sid, value);
+                // 记录下此server
                 allMembers.put(Long.valueOf(sid), qs);
                 if (qs.type == LearnerType.PARTICIPANT)
                     // 拥有投票权的成员

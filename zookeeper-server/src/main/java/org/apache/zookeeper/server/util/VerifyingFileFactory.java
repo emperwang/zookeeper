@@ -36,7 +36,9 @@ public final class VerifyingFileFactory {
     }
 
     public File create(String path) {
+        // 创建文件
         File file = new File(path);
+        // 校验
         return validate(file);
     }
 
@@ -47,6 +49,7 @@ public final class VerifyingFileFactory {
     }
 
     private void doFailForNonExistingPath(File file) {
+        // 文件不存在,则报错
         if (!file.exists()) {
             throw new IllegalArgumentException(file.toString()
                     + " file is missing");
@@ -54,7 +57,9 @@ public final class VerifyingFileFactory {
     }
 
     private void doWarnForRelativePath(File file) {
+        // 如果文件是绝对路径,则直接返回
         if(file.isAbsolute()) return;
+        // 如果文件不是,则警告
         if(file.getPath().substring(0, 2).equals("."+File.separator)) return;
         log.warn(file.getPath()+" is relative. Prepend ."
                 +File.separator+" to indicate that you're sure!");

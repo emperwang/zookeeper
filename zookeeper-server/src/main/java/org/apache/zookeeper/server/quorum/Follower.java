@@ -65,6 +65,7 @@ public class Follower extends Learner{
     void followLeader() throws InterruptedException {
         self.end_fle = Time.currentElapsedTime();
         long electionTimeTaken = self.end_fle - self.start_fle;
+        // 记录选举话费的时间
         self.setElectionTimeTaken(electionTimeTaken);
         LOG.info("FOLLOWING - LEADER ELECTION TOOK - {} {}", electionTimeTaken,
                 QuorumPeer.FLE_TIME_UNIT);
@@ -91,7 +92,7 @@ public class Follower extends Learner{
                 // 和leader进行信息同步
                 syncWithLeader(newEpochZxid);                
                 QuorumPacket qp = new QuorumPacket();
-                while (this.isRunning()) {
+                while (this.isRunning()) {  // 阻塞在这里,一直和leader进行同步
                     readPacket(qp);
                     processPacket(qp);
                 }
