@@ -48,6 +48,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements
         RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(SyncRequestProcessor.class);
     private final ZooKeeperServer zks;
+    // 等待处理的请求的容器
     private final LinkedBlockingQueue<Request> queuedRequests =
         new LinkedBlockingQueue<Request>();
     private final RequestProcessor nextProcessor;
@@ -132,6 +133,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements
                                 snapInProcess = new ZooKeeperThread("Snapshot Thread") {
                                         public void run() {
                                             try {
+                                                // 持久化
                                                 zks.takeSnapshot();
                                             } catch(Exception e) {
                                                 LOG.warn("Unexpected exception", e);

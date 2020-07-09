@@ -26,6 +26,7 @@ public class ZxidUtils {
 		return zxid & 0xffffffffL;
 	}
 	static public long makeZxid(long epoch, long counter) {
+		// Zxid的创建  epoch的低32位作为epoch高32位数据    counter的低32位作为epoch低32位
 		return (epoch << 32L) | (counter & 0xffffffffL);
 	}
 	static public String zxidToString(long zxid) {

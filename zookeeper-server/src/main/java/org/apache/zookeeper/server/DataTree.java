@@ -84,6 +84,7 @@ public class DataTree {
      * source of truth and is where all the locking occurs
      */
     // 此会存储内存中所有的节点
+    // 此 map就是内存树的存储容器
     private final ConcurrentHashMap<String, DataNode> nodes =
         new ConcurrentHashMap<String, DataNode>();
 
@@ -129,6 +130,8 @@ public class DataTree {
     /**
      * This hashtable lists the paths of the ephemeral nodes of a session.
      */
+    // 对于 临时节点的存储
+    // 按照不同的session作为key
     private final Map<Long, HashSet<String>> ephemerals =
         new ConcurrentHashMap<Long, HashSet<String>>();
 
@@ -231,11 +234,13 @@ public class DataTree {
         nodes.put(rootZookeeper, root);
 
         /** add the proc node and quota node */
-        // /zookeeper 虚拟节点的创建
+        // 记录 root 节点的子节点
         root.addChild(procChildZookeeper);
+        // /zookeeper 虚拟节点的创建
         nodes.put(procZookeeper, procDataNode);
-        // /zookeeper节点的子节点
+        // 记录procDataNode的子节点
         procDataNode.addChild(quotaChildZookeeper);
+        // /zookeeper节点的子节点
         nodes.put(quotaZookeeper, quotaDataNode);
         // 自动配置, /zookeeper/config节点
         addConfigNode();
@@ -629,6 +634,7 @@ public class DataTree {
           this.updateBytes(lastPrefix, (data == null ? 0 : data.length)
               - (lastdata == null ? 0 : lastdata.length));
         }
+        // 节点内容改变了, 触发了对应的watcher事件
         dataWatches.triggerWatch(path, EventType.NodeDataChanged);
         return s;
     }

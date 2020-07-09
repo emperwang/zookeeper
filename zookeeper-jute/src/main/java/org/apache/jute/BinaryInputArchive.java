@@ -83,7 +83,7 @@ public class BinaryInputArchive implements InputArchive {
     	in.readFully(b);
     	return new String(b, "UTF8");
     }
-    
+    // scoket数据读取的最大buffer
     static public final int maxBuffer = Integer.getInteger("jute.maxbuffer", 0xfffff);
 
     public byte[] readBuffer(String tag) throws IOException {

@@ -69,6 +69,7 @@ public class Observer extends Learner{
             try {
                 // 连接到leader
                 connectToLeader(leaderServer.addr, leaderServer.hostname);
+                // 把 当前自己信息 注册到 leader
                 long newLeaderZxid = registerWithLeader(Leader.OBSERVERINFO);
                 if (self.isReconfigStateChange())
                    throw new Exception("learned about role change");

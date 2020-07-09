@@ -39,10 +39,13 @@ import org.slf4j.LoggerFactory;
  */
 class WatchManager {
     private static final Logger LOG = LoggerFactory.getLogger(WatchManager.class);
-
+    // 存储path对应的watcher
+    // key为path, value对应多个 watcher
     private final HashMap<String, HashSet<Watcher>> watchTable =
         new HashMap<String, HashSet<Watcher>>();
-
+    // watch 对应的path
+    // 此key为watcher, value为监控的path
+    // 由此可见 watcher可以监控多个 path
     private final HashMap<Watcher, HashSet<String>> watch2Paths =
         new HashMap<Watcher, HashSet<String>>();
 
@@ -99,6 +102,8 @@ class WatchManager {
                 KeeperState.SyncConnected, path);
         HashSet<Watcher> watchers;
         synchronized (this) {
+            // 移除watcher,并获取到对应的watcher
+            // 由此可见 watcher 只能使用一次,使用完后,需要再次进行绑定
             watchers = watchTable.remove(path);
             if (watchers == null || watchers.isEmpty()) {
                 if (LOG.isTraceEnabled()) {
@@ -119,6 +124,7 @@ class WatchManager {
             if (supress != null && supress.contains(w)) {
                 continue;
             }
+            // watch的事件处理
             w.process(e);
         }
         return watchers;

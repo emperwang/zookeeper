@@ -246,6 +246,7 @@ public class Leader {
                 if (self.getQuorumListenOnAllIPs()) {
                     ss = new ServerSocket(self.getQuorumAddress().getPort());
                 } else {
+                    // 创建server 接收端
                     ss = new ServerSocket();
                 }
             }
@@ -392,15 +393,17 @@ public class Leader {
                     Socket s = null;
                     boolean error = false;
                     try {
+                        // 接收 其他 非leader server的连接
                         s = ss.accept();
 
                         // start with the initLimit, once the ack is processed
                         // in LearnerHandler switch to the syncLimit
                         s.setSoTimeout(self.tickTime * self.initLimit);
                         s.setTcpNoDelay(nodelay);
-
+                        // 获取输入流
                         BufferedInputStream is = new BufferedInputStream(
                                 s.getInputStream());
+                        // 创建一个线程  来处理接收到的 其他server的 learnerInfo
                         LearnerHandler fh = new LearnerHandler(s, is, Leader.this);
                         fh.start();
                     } catch (SocketException e) {
@@ -479,6 +482,7 @@ public class Leader {
             // Start thread that waits for connection requests from
             // new followers.
             // 处理follower的请求
+            // 接收其他 非 leader的server的请求,并创建一个新的线程LearnerHandler 进行处理
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
 
@@ -1210,15 +1214,20 @@ public class Leader {
                 return epoch;
             }
             if (lastAcceptedEpoch >= epoch) {
+                // epoch 更新
                 epoch = lastAcceptedEpoch+1;
             }
+            // 参数中sid server是否是有投票权的  server
             if (isParticipant(sid)) {
                 connectingFollowers.add(sid);
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
+            // 连接的 Followers 有自己 并且已经连接的followers的数量大于 server的一半
             if (connectingFollowers.contains(self.getId()) &&
                                             verifier.containsQuorum(connectingFollowers)) {
+                // 不等待 Epoch
                 waitingForNewEpoch = false;
+                // 设置自己的Epoch
                 self.setAcceptedEpoch(epoch);
                 connectingFollowers.notifyAll();
             } else {

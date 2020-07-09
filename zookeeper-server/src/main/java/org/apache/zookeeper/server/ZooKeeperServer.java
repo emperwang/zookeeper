@@ -465,7 +465,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         setState(State.RUNNING);
         notifyAll();
     }
-
+    // todo 处理请求的线程
     protected void setupRequestProcessors() {
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
         RequestProcessor syncProcessor = new SyncRequestProcessor(this,
@@ -493,7 +493,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         sessionTracker = new SessionTrackerImpl(this, zkDb.getSessionWithTimeOuts(),
                 tickTime, createSessionTrackerServerId, getZooKeeperServerListener());
     }
-
+    // 开始监控session过期的线程
     protected void startSessionTracker() {
         ((SessionTrackerImpl)sessionTracker).start();
     }

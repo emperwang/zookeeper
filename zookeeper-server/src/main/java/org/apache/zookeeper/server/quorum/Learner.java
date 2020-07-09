@@ -138,6 +138,12 @@ public class Learner {
     void writePacket(QuorumPacket pp, boolean flush) throws IOException {
         synchronized (leaderOs) {
             if (pp != null) {
+                // 调用流程
+                // 1. BinaryOutputArchive.writeRecord
+                // 2. --> r.serialize
+                // 3. --> QuorumPacket.serialize
+                // 4. --> leaderOs.out.{writeInt writeLong wirteBuffer}
+                // leaderOs中的out是和 leader连接的输出流,通过此out进行写出,最终就通过 socket 写入到leader
                 leaderOs.writeRecord(pp, "packet");
             }
             if (flush) {
@@ -199,12 +205,14 @@ public class Learner {
     protected QuorumServer findLeader() {
         QuorumServer leaderServer = null;
         // Find the leader by id
+        // 选举完成后, 当前选票记录了最终的选票结果,选票中有leader的具体信息
         Vote current = self.getCurrentVote();
         // 获取leader的地址
         for (QuorumServer s : self.getView().values()) {
             if (s.id == current.getId()) {
                 // Ensure we have the leader's correct IP address before
                 // attempting to connect.
+                // 重新创建 leader的地址
                 s.recreateSocketAddresses();
                 leaderServer = s;
                 break;
@@ -250,7 +258,7 @@ public class Learner {
         int initLimitTime = self.tickTime * self.initLimit;
         int remainingInitLimitTime = initLimitTime;
         long startNanoTime = nanoTime();
-
+        // 这里可以看到 连接leader时  如果失败会进行重试, 重试次数为5
         for (int tries = 0; tries < 5; tries++) {
             try {
                 // recalculate the init limit time because retries sleep for 1000 milliseconds
@@ -259,10 +267,10 @@ public class Learner {
                     LOG.error("initLimit exceeded on retries.");
                     throw new IOException("initLimit exceeded on retries.");
                 }
-
+                // 连接到 leader
                 sockConnect(sock, addr, Math.min(self.tickTime * self.syncLimit, remainingInitLimitTime));
                 if (self.isSslQuorum())  {
-                    ((SSLSocket) sock).startHandshake();
+                    ((SSLSocket) sock).startHandshake();    // 如果是ssl加密的,那么先开始进行握手操作
                 }
                 sock.setTcpNoDelay(nodelay);
                 break;
@@ -290,11 +298,12 @@ public class Learner {
         }
 
         self.authLearner.authenticate(sock, hostname);
-
+        // 此leaderIs 是和 leader交互的数据流
         leaderIs = BinaryInputArchive.getArchive(new BufferedInputStream(
                 sock.getInputStream()));
+        // 输出流
         bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
-        // 创建输出流
+        // 此leaderOs 是和 leader交互的数据输出流
         leaderOs = BinaryOutputArchive.getArchive(bufferedOutput);
     }
 
@@ -320,32 +329,44 @@ public class Learner {
         /*
          * Send follower info, including last zxid and sid
          */
+        // 上次接收到的Zxid
     	long lastLoggedZxid = self.getLastLoggedZxid();
-        QuorumPacket qp = new QuorumPacket();                
+    	// 数据包,记录要发送的数据
+        QuorumPacket qp = new QuorumPacket();
+        // 数据包的类型
         qp.setType(pktType);
+        // 此次数据的 Zxid
         qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
         
         /*
          * Add sid to payload
          */
+        // LeaderInfo 包装了此次的 数据包的数据
         LearnerInfo li = new LearnerInfo(self.getId(), 0x10000, self.getQuorumVerifier().getVersion());
+        // 存储要发送的数据
         ByteArrayOutputStream bsid = new ByteArrayOutputStream();
+        // 静态方法 来创建写入流
         BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
+        // 把 LearnerInfo中的数据写入到 ByteArrayOutputStream
         boa.writeRecord(li, "LearnerInfo");
+        // 保存数据
         qp.setData(bsid.toByteArray());
-        // 写数据
+        // 把数据通过 leadOps 写入到leader
         writePacket(qp, true);
-        readPacket(qp);        
+        // 接收leader传递回来的消息
+        readPacket(qp);
+        // 从leader传递回的package中的zxid 获取 epoch
         final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
 		if (qp.getType() == Leader.LEADERINFO) {
         	// we are connected to a 1.0 server so accept the new epoch and read the next packet
-        	// 获取leader发送的Epoch
+        	// 获取leader发送的data
             leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
         	byte epochBytes[] = new byte[4];
         	final ByteBuffer wrappedEpochBytes = ByteBuffer.wrap(epochBytes);
         	// 如果leader的epoch大于自己的,则更新
         	if (newEpoch > self.getAcceptedEpoch()) {
         		wrappedEpochBytes.putInt((int)self.getCurrentEpoch());
+        		// 记录从 leader接收的 Epoch
         		self.setAcceptedEpoch(newEpoch);
         		// 相等,则
         	} else if (newEpoch == self.getAcceptedEpoch()) {
@@ -360,7 +381,9 @@ public class Learner {
         	}
         	// 创建响应的 packet , 回复给leader
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
+        	// 把响应的package 写回到 leader
         	writePacket(ackNewEpoch, true);
+        	// 使用从leader接收到的Epoch 生成新的 Zxid 并返回
             return ZxidUtils.makeZxid(newEpoch, 0);
         } else {
 		    // 新的Epoch大于自己的,则更新
@@ -440,6 +463,7 @@ public class Learner {
 
             }
             zk.getZKDatabase().initConfigInZKDatabase(self.getQuorumVerifier());
+            // 记录此 session
             zk.createSessionTracker();            
             
             long lastQueued = 0;

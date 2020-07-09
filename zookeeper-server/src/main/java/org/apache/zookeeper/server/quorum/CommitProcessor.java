@@ -84,6 +84,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements
 
     /**
      * Requests that have been committed.
+     * 等待提交的 request
      */
     protected final LinkedBlockingQueue<Request> committedRequests =
         new LinkedBlockingQueue<Request>();

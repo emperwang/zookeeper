@@ -52,6 +52,7 @@ public class FileTxnSnapLog {
     private final File dataDir;
     //the directory containing the
     //the snapshot directory
+    // snapDir 保存快照的目录
     private final File snapDir;
     private TxnLog txnLog;
     private SnapShot snapLog;
@@ -213,8 +214,10 @@ public class FileTxnSnapLog {
      */
     public long restore(DataTree dt, Map<Long, Integer> sessions,
                         PlayBackListener listener) throws IOException {
+        // 获取上次的zxid
         long deserializeResult = snapLog.deserialize(dt, sessions);
         FileTxnLog txnLog = new FileTxnLog(dataDir);
+        // 健康性检测
         if (-1L == deserializeResult) {
             /* this means that we couldn't find any snapshot, so we need to
              * initialize an empty database (reported in ZOOKEEPER-2325) */
@@ -229,6 +232,7 @@ public class FileTxnSnapLog {
             }
             /* TODO: (br33d) we should either put a ConcurrentHashMap on restore()
              *       or use Map on save() */
+            // 保存一下  快照
             save(dt, (ConcurrentHashMap<Long, Integer>)sessions);
             /* return a zxid of zero, since we the database is empty */
             return 0;
@@ -379,6 +383,10 @@ public class FileTxnSnapLog {
      * serialized onto disk
      * @throws IOException
      */
+    // 内存树 持久化到 文件中
+    // 文件名为: snapshot.Long.toHexString(zxid)
+    // 文件内容:
+    // 1. magicNum  version
     public void save(DataTree dataTree,
             ConcurrentHashMap<Long, Integer> sessionsWithTimeouts)
         throws IOException {

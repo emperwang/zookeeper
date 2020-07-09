@@ -1183,6 +1183,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         if (getElectionType() == 0) {
             electionAlg = new LeaderElection(this);
         }
+        // 获取选举算法
         return electionAlg;
     }
 
@@ -1193,7 +1194,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     synchronized protected void setFollower(Follower newFollower){
         follower=newFollower;
     }
-
+    // 设置自己角色 为 Observer
     synchronized protected void setObserver(Observer newObserver){
         observer=newObserver;
     }
@@ -1247,10 +1248,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         try {
             /*
              * Main loop
-             * todo 重要  选举的操作
+             * todo 重要  选举的操作 以及其他平时的数据交互操作
              */
             while (running) {
-                // 根据不同的状态,来进行不同的操作
+                // 根据自己当前的状态,来进行不同的操作
                 switch (getPeerState()) {
                 case LOOKING:
                     LOG.info("LOOKING");
@@ -1310,6 +1311,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                                }
                             // leader选举
                             // 设置选票为 leader选票
+                            // todo 重要  此处是真正的选举操作
                             setCurrentVote(makeLEStrategy().lookForLeader());
                         } catch (Exception e) {
                             LOG.warn("Unexpected exception", e);
@@ -1320,6 +1322,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 case OBSERVING:
                     try {
                         LOG.info("OBSERVING");
+                        // makeObserver 创建Observer
+                        // setObserver 记录创建的Observer
                         setObserver(makeObserver(logFactory));
                         // 找到leader 并 注册
                         observer.observeLeader();

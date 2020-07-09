@@ -78,6 +78,10 @@ public class FileSnap implements SnapShot {
         }
         File snap = null;
         boolean foundValid = false;
+        // 降序找到所有的 snapshot 文件; 也就是说读取文件时,会从最新的开始读取
+        // 看下面的处理, 虽然看起来时处理所有,不过当读取第一个文件是有效的,那么就会break
+        // 这样处理还有一个好处时,如果前几个是无效的文件,那么也会跳过,直到读取到一个有效的快照文件
+        // todo 这样的处理很巧妙哦
         for (int i = 0, snapListSize = snapList.size(); i < snapListSize; i++) {
             snap = snapList.get(i);
             LOG.info("Reading snapshot " + snap);
@@ -99,6 +103,7 @@ public class FileSnap implements SnapShot {
         if (!foundValid) {
             throw new IOException("Not able to find valid snapshots in " + snapDir);
         }
+        // 获取上次处理的Zxid
         dt.lastProcessedZxid = Util.getZxidFromName(snap.getName(), SNAPSHOT_FILE_PREFIX);
         return dt.lastProcessedZxid;
     }
@@ -147,6 +152,7 @@ public class FileSnap implements SnapShot {
      * @throws IOException
      */
     private List<File> findNValidSnapshots(int n) throws IOException {
+        // 从快照目录中找到文件,并进行排序,排序按照目录 snapshot. 之后的数字
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
         List<File> list = new ArrayList<File>();
@@ -223,6 +229,14 @@ public class FileSnap implements SnapShot {
                  CheckedOutputStream crcOut = new CheckedOutputStream(sessOS, new Adler32())) {
                 //CheckedOutputStream cout = new CheckedOutputStream()
                 OutputArchive oa = BinaryOutputArchive.getArchive(crcOut);
+                // 文件内容:
+                // 1. magic num: ByteBuffer.wrap("ZKSN".getBytes()).getInt()
+                // 2. version 2
+                // 3. dbId -1
+                // 4. session: sessionId 过期时间
+                // 5. 目录树中的 node
+                // 6. checkSum
+                // 7. /
                 FileHeader header = new FileHeader(SNAP_MAGIC, VERSION, dbId);
                 serialize(dt, sessions, oa, header);
                 long val = crcOut.getChecksum().getValue();

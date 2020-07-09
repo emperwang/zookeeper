@@ -71,6 +71,7 @@ public class ZKDatabase {
      * all these members.
      */
     protected DataTree dataTree;
+    // 存储每个连接的session 及其 过期时间
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
     protected FileTxnSnapLog snapLog;
     protected long minCommittedLog, maxCommittedLog;
@@ -605,6 +606,7 @@ public class ZKDatabase {
                 LOG.warn("configuration znode missing (should only happen during upgrade), creating the node");
                 this.dataTree.addConfigNode();
             }
+            // 更新 /zookeeper/config节点的内容
             this.dataTree.setData(ZooDefs.CONFIG_NODE, qv.toString().getBytes(), -1, qv.getVersion(), Time.currentWallTime());
         } catch (NoNodeException e) {
             System.out.println("configuration node missing - should not happen");
