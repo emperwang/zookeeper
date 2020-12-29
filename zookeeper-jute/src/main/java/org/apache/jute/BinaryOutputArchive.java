@@ -31,7 +31,7 @@ import java.util.TreeMap;
  */
 public class BinaryOutputArchive implements OutputArchive {
     private ByteBuffer bb = ByteBuffer.allocate(1024);
-
+    // 输出流
     private DataOutput out;
     
     public static BinaryOutputArchive getArchive(OutputStream strm) {
@@ -40,10 +40,12 @@ public class BinaryOutputArchive implements OutputArchive {
     
     /** Creates a new instance of BinaryOutputArchive */
     public BinaryOutputArchive(DataOutput out) {
+        // 记录输出流
         this.out = out;
     }
     
     public void writeByte(byte b, String tag) throws IOException {
+        // 写书到 输出流中
         out.writeByte(b);
     }
     

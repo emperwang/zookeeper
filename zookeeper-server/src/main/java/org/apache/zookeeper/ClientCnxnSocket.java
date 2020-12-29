@@ -53,6 +53,7 @@ abstract class ClientCnxnSocket {
     /**
      * This buffer is only used to read the length of the incoming message.
      */
+    // 存储消息长度的 buffer
     protected final ByteBuffer lenBuffer = ByteBuffer.allocateDirect(4);
 
     /**
@@ -60,12 +61,16 @@ abstract class ClientCnxnSocket {
      * readLength() to receive the full message.
      */
     protected ByteBuffer incomingBuffer = lenBuffer;
+    // 记录发送的数据量
     protected final AtomicLong sentCount = new AtomicLong(0L);
+    // 记录接收的数据量
     protected final AtomicLong recvCount = new AtomicLong(0L);
     protected long lastHeard;
     protected long lastSend;
     protected long now;
+    // 记录发送线程
     protected ClientCnxn.SendThread sendThread;
+    // 待发送的packet 队列
     protected LinkedBlockingDeque<Packet> outgoingQueue;
     protected ZKClientConfig clientConfig;
     private int packetLen = ZKClientConfig.CLIENT_MAX_PACKET_LENGTH_DEFAULT;
@@ -74,16 +79,21 @@ abstract class ClientCnxnSocket {
      * The sessionId is only available here for Log and Exception messages.
      * Otherwise the socket doesn't need to know it.
      */
+    // sessionId
     protected long sessionId;
 
     void introduce(ClientCnxn.SendThread sendThread, long sessionId,
                    LinkedBlockingDeque<Packet> outgoingQueue) {
+        // 发送线程
         this.sendThread = sendThread;
+        // sessionId
         this.sessionId = sessionId;
+        // 待发送的packet 队列
         this.outgoingQueue = outgoingQueue;
     }
 
     void updateNow() {
+        // 记录当前的时间戳
         now = Time.currentElapsedTime();
     }
 
@@ -106,13 +116,15 @@ abstract class ClientCnxnSocket {
     void updateLastHeard() {
         this.lastHeard = now;
     }
-
+    // 更新发送时间
     void updateLastSend() {
         this.lastSend = now;
     }
 
     void updateLastSendAndHeard() {
+        // 上次发送时间
         this.lastSend = now;
+        // 上次收到的时间
         this.lastHeard = now;
     }
 
@@ -232,6 +244,7 @@ abstract class ClientCnxnSocket {
 
     protected void initProperties() throws IOException {
         try {
+            // 得到packetLen 即每个packet的长度
             packetLen = clientConfig.getInt(ZKConfig.JUTE_MAXBUFFER,
                     ZKClientConfig.CLIENT_MAX_PACKET_LENGTH_DEFAULT);
             LOG.info("{} value is {} Bytes", ZKConfig.JUTE_MAXBUFFER,

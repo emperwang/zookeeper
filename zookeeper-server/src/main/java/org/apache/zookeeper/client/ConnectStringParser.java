@@ -38,9 +38,9 @@ import static org.apache.zookeeper.common.StringUtils.split;
  */
 public final class ConnectStringParser {
     private static final int DEFAULT_PORT = 2181;
-
+    // 默认使用 一般情况下 chrootPath=null
     private final String chrootPath;
-
+    // 保存server端的地址
     private final ArrayList<InetSocketAddress> serverAddresses = new ArrayList<InetSocketAddress>();
 
     /**
@@ -48,6 +48,7 @@ public final class ConnectStringParser {
      * @throws IllegalArgumentException
      *             for an invalid chroot path.
      */
+    // connectStr=192.168.254.135:2181,192.168.254.136:2181,192.168.254.137:2181
     public ConnectStringParser(String connectString) {
         // parse out chroot, if any
         int off = connectString.indexOf('/');
@@ -76,6 +77,7 @@ public final class ConnectStringParser {
                 }
                 host = host.substring(0, pidx);
             }
+            // 保存server的地址
             serverAddresses.add(InetSocketAddress.createUnresolved(host, port));
         }
     }

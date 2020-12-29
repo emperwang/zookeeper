@@ -74,7 +74,10 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
     private Channel channel;
     private CountDownLatch firstConnect;
     private ChannelFuture connectFuture;
+    // 连接锁
     private final Lock connectLock = new ReentrantLock();
+    // 记录是否关闭连接
+    // 在连接完成后 在回调函数中设置
     private final AtomicBoolean disconnected = new AtomicBoolean();
     private final AtomicBoolean needSasl = new AtomicBoolean();
     private final Semaphore waitSasl = new Semaphore(0);
@@ -87,6 +90,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
         // Client only has 1 outgoing socket, so the event loop group only needs
         // a single thread.
         eventLoopGroup = NettyUtils.newNioOrEpollEventLoopGroup(1 /* nThreads */);
+        // 得到每个packet的长度
         initProperties();
     }
 
@@ -126,7 +130,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
             return bootstrap;
         }
     }
-
+    // 连接操作
     @Override
     void connect(InetSocketAddress addr) throws IOException {
         firstConnect = new CountDownLatch(1);
@@ -136,13 +140,16 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                 .channel(NettyUtils.nioOrEpollSocketChannel())
                 .option(ChannelOption.SO_LINGER, -1)
                 .option(ChannelOption.TCP_NODELAY, true)
+                // 初始化handler
                 .handler(new ZKClientPipelineFactory(addr.getHostString(), addr.getPort()));
         bootstrap = configureBootstrapAllocator(bootstrap);
         bootstrap.validate();
 
         connectLock.lock();
         try {
+            // 连接操作
             connectFuture = bootstrap.connect(addr);
+            // 对连接添加回调函数
             connectFuture.addListener(new ChannelFutureListener() {
                 @Override
                 public void operationComplete(ChannelFuture channelFuture) throws Exception {
@@ -150,9 +157,11 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                     boolean connected = false;
                     connectLock.lock();
                     try {
+                        // 没有成功直接返回
                         if (!channelFuture.isSuccess()) {
                             LOG.info("future isn't success, cause:", channelFuture.cause());
                             return;
+                            // 参数为null,则关闭channel
                         } else if (connectFuture == null) {
                             LOG.info("connect attempt cancelled");
                             // If the connect attempt was cancelled but succeeded
@@ -162,8 +171,9 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                             return;
                         }
                         // setup channel, variables, connection, etc.
+                        // 获取对应的channel
                         channel = channelFuture.channel();
-
+                        //
                         disconnected.set(false);
                         initialized = false;
                         lenBuffer.clear();
@@ -176,6 +186,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                         if (sendThread.tunnelAuthInProgress()) {
                             waitSasl.drainPermits();
                             needSasl.set(true);
+                            // 发送信息
                             sendPrimePacket();
                         } else {
                             needSasl.set(false);
@@ -275,9 +286,11 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                     return;
                 }
             } else {
+                // 从队列中 超时获取一个 packet
                 head = outgoingQueue.poll(waitTimeOut, TimeUnit.MILLISECONDS);
             }
             // check if being waken up on closing.
+            // 如果当前sendThread出现问题,则再次把获取到的 packet 重新放入到 outgoingQueue 中
             if (!sendThread.getZkState().isAlive()) {
                 // adding back the packet to notify of failure in conLossPacket().
                 addBack(head);
@@ -285,12 +298,14 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
             }
             // channel disconnection happened
             if (disconnected.get()) {
+                // 断连了,则同样再次 把获取到的packet 放入到 outgoingQueue
                 addBack(head);
                 throw new EndOfStreamException("channel for sessionid 0x"
                         + Long.toHexString(sessionId)
                         + " is lost");
             }
             if (head != null) {
+                // 真实发送
                 doWrite(pendingQueue, head, cnxn);
             }
         } finally {
@@ -334,16 +349,20 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
     private ChannelFuture sendPkt(Packet p, boolean doFlush) {
         // Assuming the packet will be sent out successfully. Because if it fails,
         // the channel will close and clean up queues.
+        // 把数据转换为 byteBuffer
         p.createBB();
+        // 更新发送时间
         updateLastSend();
         final ByteBuf writeBuffer = Unpooled.wrappedBuffer(p.bb);
+        // 写数据到channel
         final ChannelFuture result = doFlush
                 ? channel.writeAndFlush(writeBuffer)
                 : channel.write(writeBuffer);
+        // 添加一个回调函数 记录发送的数量
         result.addListener(onSendPktDoneListener);
         return result;
     }
-
+    // 发送第一个主要的 packet
     private void sendPrimePacket() {
         // assuming the first packet is the priming packet.
         sendPktAndFlush(outgoingQueue.remove());
@@ -352,6 +371,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
     /**
      * doWrite handles writing the packets from outgoingQueue via network to server.
      */
+    // 真实发送packet
     private void doWrite(List<Packet> pendingQueue, Packet p, ClientCnxn cnxn) {
         updateNow();
         boolean anyPacketsSent = false;
@@ -360,21 +380,26 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                 if ((p.requestHeader != null) &&
                         (p.requestHeader.getType() != ZooDefs.OpCode.ping) &&
                         (p.requestHeader.getType() != ZooDefs.OpCode.auth)) {
+                    // 设置 Xid
                     p.requestHeader.setXid(cnxn.getXid());
                     synchronized (pendingQueue) {
+                        // 把发送的packet 记录到 pendingQueue
                         pendingQueue.add(p);
                     }
                 }
+                // 发送packet
                 sendPktOnly(p);
                 anyPacketsSent = true;
             }
             if (outgoingQueue.isEmpty()) {
                 break;
             }
+            // 再次从待发送列表中获取一个待发送的packet
             p = outgoingQueue.remove();
         }
         // TODO: maybe we should flush in the loop above every N packets/bytes?
         // But, how do we determine the right value for N ...
+        // 如果上面真实发送了packet,则在这里进行一次 flush
         if (anyPacketsSent) {
             channel.flush();
         }
@@ -443,6 +468,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
             if (clientConfig.getBoolean(ZKClientConfig.SECURE_CLIENT)) {
                 initSSL(pipeline);
             }
+            // 添加 handler
             pipeline.addLast("handler", new ZKClientHandler());
         }
 
@@ -485,23 +511,27 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
             disconnected.set(true);
             onClosing();
         }
-
+        // 读取操作
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, ByteBuf buf) throws Exception {
             updateNow();
             while (buf.isReadable()) {
+                // 数据可读数量少,则等待
                 if (incomingBuffer.remaining() > buf.readableBytes()) {
                     int newLimit = incomingBuffer.position()
                             + buf.readableBytes();
                     incomingBuffer.limit(newLimit);
                 }
+                // 读取数据到 incomingBuffer
                 buf.readBytes(incomingBuffer);
                 incomingBuffer.limit(incomingBuffer.capacity());
-
+                // 是否读取到数据
                 if (!incomingBuffer.hasRemaining()) {
                     incomingBuffer.flip();
                     if (incomingBuffer == lenBuffer) {
+                        // 增加接收量
                         recvCount.getAndIncrement();
+                        // 读取发送的长度
                         readLength();
                     } else if (!initialized) {
                         readConnectResult();
@@ -510,6 +540,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                         initialized = true;
                         updateLastHeard();
                     } else {
+                        // 读取数据
                         sendThread.readResponse(incomingBuffer);
                         lenBuffer.clear();
                         incomingBuffer = lenBuffer;

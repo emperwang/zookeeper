@@ -28,7 +28,7 @@ public class ZooKeeperThread extends Thread {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(ZooKeeperThread.class);
-
+    // 未捕获异常的处理
     private UncaughtExceptionHandler uncaughtExceptionalHandler = new UncaughtExceptionHandler() {
 
         @Override
@@ -36,7 +36,7 @@ public class ZooKeeperThread extends Thread {
             handleException(t.getName(), e);
         }
     };
-
+    // 设置线程名字,并设置 未捕获异常处理器
     public ZooKeeperThread(String threadName) {
         super(threadName);
         setUncaughtExceptionHandler(uncaughtExceptionalHandler);
@@ -51,6 +51,7 @@ public class ZooKeeperThread extends Thread {
      * @param e
      *            - exception object
      */
+    // 对于未捕获异常,此处只是打印
     protected void handleException(String thName, Throwable e) {
         LOG.warn("Exception occurred from thread {}", thName, e);
     }
