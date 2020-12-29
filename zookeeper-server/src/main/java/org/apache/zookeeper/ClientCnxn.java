@@ -961,6 +961,7 @@ public class ClientCnxn {
                             + Long.toHexString(sessionId) + ", packet:: " + packet);
                 }
             } finally {
+                // 在这里根据响应的结果,来进行watcher的是否注册
                 finishPacket(packet);
             }
         }
