@@ -176,7 +176,7 @@ public class ServerStats {
         resetRequestCounters();
         clientResponseStats.reset();
     }
-
+    // 更新响应客户端的 packet大小
     public void updateClientResponseSize(int size) {
         clientResponseStats.setLastBufferSize(size);
     }

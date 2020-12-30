@@ -946,6 +946,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         loadDataBase();
         // selector 接收客户端请求 并进行处理
         // 一个selector 多个worker 和 netty 很像
+        // ************************************服务端请求接收****************
         startServerCnxnFactory();
         try {
             adminServer.start();

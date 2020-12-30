@@ -67,7 +67,7 @@ public abstract class ServerCnxn implements Stats, Watcher {
     abstract int getSessionTimeout();
 
     abstract void close();
-
+    // 响应客户端的请求
     public void sendResponse(ReplyHeader h, Record r, String tag) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         // Make space for length
@@ -85,7 +85,9 @@ public abstract class ServerCnxn implements Stats, Watcher {
         byte b[] = baos.toByteArray();
         serverStats().updateClientResponseSize(b.length - 4);
         ByteBuffer bb = ByteBuffer.wrap(b);
+        // 放入大小
         bb.putInt(b.length - 4).rewind();
+        // 发送数据
         sendBuffer(bb);
     }
 
@@ -144,6 +146,7 @@ public abstract class ServerCnxn implements Stats, Watcher {
     }
 
     protected void packetReceived() {
+        // 接收packet数 增加
         incrPacketsReceived();
         ServerStats serverStats = serverStats();
         if (serverStats != null) {

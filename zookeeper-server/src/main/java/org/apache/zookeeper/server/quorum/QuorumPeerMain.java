@@ -153,6 +153,7 @@ public class QuorumPeerMain {
             // getClientPortAddress 获取客户端登录时的地址
           if (config.getClientPortAddress() != null) {
               // 通过反射创建NIOServerCnxnFactory, NIO 通信
+              // ***************************************************
               cnxnFactory = ServerCnxnFactory.createFactory();
               // 创建 NioServerSocket 以及 worker处理IO的线程
               // 对NioServer进行一些配置

@@ -55,6 +55,8 @@ import org.slf4j.LoggerFactory;
  * This class handles communication with clients using NIO. There is one per
  * client, but only one thread doing the communication.
  */
+// 可以看到一个 NIOServerCnxn就是一个客户端的连接请求
+// ServerCnxn 同样也是这样的一个
 public class NIOServerCnxn extends ServerCnxn {
     private static final Logger LOG = LoggerFactory.getLogger(NIOServerCnxn.class);
 
@@ -71,7 +73,7 @@ public class NIOServerCnxn extends ServerCnxn {
     private final ByteBuffer lenBuffer = ByteBuffer.allocate(4);
 
     private ByteBuffer incomingBuffer = lenBuffer;
-
+    // 记录要发送的数据
     private final Queue<ByteBuffer> outgoingBuffers =
         new LinkedBlockingQueue<ByteBuffer>();
 
@@ -95,8 +97,11 @@ public class NIOServerCnxn extends ServerCnxn {
     public NIOServerCnxn(ZooKeeperServer zk, SocketChannel sock,
                          SelectionKey sk, NIOServerCnxnFactory factory,
                          SelectorThread selectorThread) throws IOException {
+        // 当前节点
         this.zkServer = zk;
+        // 对客户端连接的socket
         this.sock = sock;
+        // selectionKey
         this.sk = sk;
         this.factory = factory;
         this.selectorThread = selectorThread;
@@ -151,18 +156,22 @@ public class NIOServerCnxn extends ServerCnxn {
      * sendBuffer pushes a byte buffer onto the outgoing buffer queue for
      * asynchronous writes.
      */
+    // 发送server处理完的响应数据
     public void sendBuffer(ByteBuffer bb) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Add a buffer to outgoingBuffers, sk " + sk
                       + " is valid: " + sk.isValid());
         }
+        // 可以看到这里其实是吧数据缓存起来,异步发送
         outgoingBuffers.add(bb);
         requestInterestOpsUpdate();
     }
 
     /** Read the request payload (everything following the length prefix) */
+    // 读取请求的数据 来进行处理
     private void readPayload() throws IOException, InterruptedException {
         if (incomingBuffer.remaining() != 0) { // have we read length bytes?
+            // 读取数据
             int rc = sock.read(incomingBuffer); // sock is non-blocking, so ok
             if (rc < 0) {
                 throw new EndOfStreamException(
@@ -173,12 +182,14 @@ public class NIOServerCnxn extends ServerCnxn {
         }
 
         if (incomingBuffer.remaining() == 0) { // have we read length bytes?
+            // server端接收的packet数增加  监控数据
             packetReceived();
             incomingBuffer.flip();
             if (!initialized) {
                 readConnectRequest();
             } else {
                 // 读取包信息,进行处理
+                // ****************************
                 readRequest();
             }
             lenBuffer.clear();
@@ -211,7 +222,8 @@ public class NIOServerCnxn extends ServerCnxn {
             selectorThread.addInterestOpsUpdateRequest(sk);
         }
     }
-
+    // *******************************88
+    // 数据的发送
     void handleWrite(SelectionKey k) throws IOException, CloseRequestException {
         if (outgoingBuffers.isEmpty()) {
             return;
@@ -228,6 +240,7 @@ public class NIOServerCnxn extends ServerCnxn {
             ByteBuffer[] bufferList = new ByteBuffer[outgoingBuffers.size()];
             // Use gathered write call. This updates the positions of the
             // byte buffers to reflect the bytes that were written out.
+            // 先发送bufferList的长度
             sock.write(outgoingBuffers.toArray(bufferList));
 
             // Remove the buffers that we have sent
@@ -292,6 +305,7 @@ public class NIOServerCnxn extends ServerCnxn {
                     bb.position(bb.position() + sent);
                     break;
                 }
+                // 数据发送
                 packetSent();
                 /* We've sent the whole buffer, so drop the buffer */
                 sent -= bb.remaining();
@@ -310,6 +324,7 @@ public class NIOServerCnxn extends ServerCnxn {
     /**
      * Handles read/write IO on connection.
      */
+    // 处理客户端的读写请求
     void doIO(SelectionKey k) throws InterruptedException {
         try {
             if (isSocketOpen() == false) {
@@ -320,6 +335,7 @@ public class NIOServerCnxn extends ServerCnxn {
             }
             // 如果数据可读,则输入数据到 buffer中
             if (k.isReadable()) {
+                // 读取数据的长度
                 int rc = sock.read(incomingBuffer);
                 if (rc < 0) {
                     throw new EndOfStreamException(
@@ -331,6 +347,7 @@ public class NIOServerCnxn extends ServerCnxn {
                     boolean isPayload;
                     if (incomingBuffer == lenBuffer) { // start of next request
                         incomingBuffer.flip();
+                        // 读取此次数据包的长度,并分配一个和数据长度相等的缓存
                         isPayload = readLength(k);
                         incomingBuffer.clear();
                     } else {
@@ -338,6 +355,8 @@ public class NIOServerCnxn extends ServerCnxn {
                         isPayload = true;
                     }
                     if (isPayload) { // not the case for 4letterword
+                        // **********************
+                        // 读物 socket中的数据
                         readPayload();
                     }
                     else {
@@ -349,6 +368,7 @@ public class NIOServerCnxn extends ServerCnxn {
             }
             if (k.isWritable()) {
                 // 写数据
+                // *********************************************
                 handleWrite(k);
 
                 if (!initialized && !getReadInterest() && !getWriteInterest()) {
@@ -378,7 +398,8 @@ public class NIOServerCnxn extends ServerCnxn {
             close();
         }
     }
-
+    // ******************************
+    // 开始对接收到的 packet进行处理
     private void readRequest() throws IOException {
         zkServer.processPacket(this, incomingBuffer);
     }
@@ -386,13 +407,17 @@ public class NIOServerCnxn extends ServerCnxn {
     // Only called as callback from zkServer.processPacket()
     protected void incrOutstandingRequests(RequestHeader h) {
         if (h.getXid() >= 0) {
+            // 输出request数量增加
             outstandingRequests.incrementAndGet();
             // check throttling
+            // ***************** 限流
+            // requestsInProcess 记录了正在处理的请求,当处理请求大于 outstandingLimit,则停止接收
             int inProcess = zkServer.getInProcess();
             if (inProcess > outstandingLimit) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Throttling recv " + inProcess);
                 }
+                // 停止接收
                 disableRecv();
             }
         }
@@ -414,8 +439,10 @@ public class NIOServerCnxn extends ServerCnxn {
 
     // Throttle acceptance of new requests. If this entailed a state change,
     // register an interest op update request with the selector.
+    // 停止接收
     public void disableRecv() {
         if (throttled.compareAndSet(false, true)) {
+            // 更新对应的selectionKey中没有 read事件
             requestInterestOpsUpdate();
         }
     }
@@ -548,6 +575,7 @@ public class NIOServerCnxn extends ServerCnxn {
      */
     private boolean readLength(SelectionKey k) throws IOException {
         // Read the length, now get the buffer
+        // 获取此次包的 数据长度
         int len = lenBuffer.getInt();
         if (!initialized && checkFourLetterWord(sk, len)) {
             return false;
@@ -558,6 +586,7 @@ public class NIOServerCnxn extends ServerCnxn {
         if (!isZKServerRunning()) {
             throw new IOException("ZooKeeperServer not running");
         }
+        // 分配 和要读取数据长度一致的一个 缓存
         incomingBuffer = ByteBuffer.allocate(len);
         return true;
     }
@@ -687,6 +716,7 @@ public class NIOServerCnxn extends ServerCnxn {
      * @see org.apache.zookeeper.server.ServerCnxnIface#sendResponse(org.apache.zookeeper.proto.ReplyHeader,
      *      org.apache.jute.Record, java.lang.String)
      */
+    // 发送响应
     @Override
     public void sendResponse(ReplyHeader h, Record r, String tag) {
         try {
@@ -708,8 +738,10 @@ public class NIOServerCnxn extends ServerCnxn {
      *
      * @see org.apache.zookeeper.server.ServerCnxnIface#process(org.apache.zookeeper.proto.WatcherEvent)
      */
+    // zk watcher机制的触发
     @Override
     public void process(WatchedEvent event) {
+        // 响应头的创建
         ReplyHeader h = new ReplyHeader(-1, -1L, 0);
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG, ZooTrace.EVENT_DELIVERY_TRACE_MASK,
@@ -719,8 +751,9 @@ public class NIOServerCnxn extends ServerCnxn {
         }
 
         // Convert WatchedEvent to a type that can be sent over the wire
+        // 获取到 对应的 watcherEvent
         WatcherEvent e = event.getWrapper();
-
+        // 发送事件到  客户端
         sendResponse(h, e, "notification");
     }
 
@@ -745,16 +778,18 @@ public class NIOServerCnxn extends ServerCnxn {
         this.sessionTimeout = sessionTimeout;
         factory.touchCnxn(this);
     }
-
+    // 获取此连接对应的 感兴趣事件  read|write
     @Override
     public int getInterestOps() {
         if (!isSelectable()) {
             return 0;
         }
         int interestOps = 0;
+        // 设置read 事件
         if (getReadInterest()) {
             interestOps |= SelectionKey.OP_READ;
         }
+        // 如果outgoingBuffers 待发送列表不为空,则对 write事件感兴趣
         if (getWriteInterest()) {
             interestOps |= SelectionKey.OP_WRITE;
         }

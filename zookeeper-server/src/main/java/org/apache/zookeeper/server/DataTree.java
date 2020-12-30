@@ -138,12 +138,14 @@ public class DataTree {
     /**
      * This set contains the paths of all container nodes
      */
+    // container 类型的节点
     private final Set<String> containers =
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
     /**
      * This set contains the paths of all ttl nodes
      */
+    // 存储 ttl 类型的节点
     private final Set<String> ttls =
             Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
@@ -457,12 +459,15 @@ public class DataTree {
         stat.setVersion(0);
         stat.setAversion(0);
         stat.setEphemeralOwner(ephemeralOwner);
+        // 获取父节点
         DataNode parent = nodes.get(parentName);
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (parent) {
+            // 得到此父节点的 子节点
             Set<String> children = parent.getChildren();
+            // 如果已经存在 子节点,则报错
             if (children.contains(childName)) {
                 throw new KeeperException.NodeExistsException();
             }
@@ -471,12 +476,19 @@ public class DataTree {
                 parentCVersion = parent.stat.getCversion();
                 parentCVersion++;
             }
+            // 更新父节点的 Cversion
             parent.stat.setCversion(parentCVersion);
+            // 设置父节点的 Pzxid
             parent.stat.setPzxid(zxid);
+            // acl 权限
             Long longval = aclCache.convertAcls(acl);
+            // 创建子节点
             DataNode child = new DataNode(data, longval, stat);
+            // 把此节点添加到父节点下
             parent.addChild(childName);
+            // 记录此节点
             nodes.put(path, child);
+            // 节点类型
             EphemeralType ephemeralType = EphemeralType.get(ephemeralOwner);
             if (ephemeralType == EphemeralType.CONTAINER) {
                 containers.add(path);
@@ -516,6 +528,8 @@ public class DataTree {
             updateCount(lastPrefix, 1);
             updateBytes(lastPrefix, data == null ? 0 : data.length);
         }
+        // *******************************************
+        // 触发 watcher机制
         dataWatches.triggerWatch(path, Event.EventType.NodeCreated);
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 Event.EventType.NodeChildrenChanged);
@@ -793,11 +807,11 @@ public class DataTree {
     }
 
     public volatile long lastProcessedZxid = 0;
-
+    // 请求处理
     public ProcessTxnResult processTxn(TxnHeader header, Record txn) {
         return this.processTxn(header, txn, false);
     }
-
+    // 请求处理
     public ProcessTxnResult processTxn(TxnHeader header, Record txn, boolean isSubTxn)
     {
         ProcessTxnResult rc = new ProcessTxnResult();
@@ -809,8 +823,10 @@ public class DataTree {
             rc.type = header.getType();
             rc.err = 0;
             rc.multiResult = null;
+            // 根据不同的类型  来进行处理
             switch (header.getType()) {
                 case OpCode.create:
+                    // 如果是create,则创建节点
                     CreateTxn createTxn = (CreateTxn) txn;
                     rc.path = createTxn.getPath();
                     createNode(

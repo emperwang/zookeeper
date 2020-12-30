@@ -98,6 +98,7 @@ public class WorkerService {
      * for use with non-assignable WorkerServices. For assignable
      * WorkerServices, will always run on the first thread.
      */
+    // 把请求放入线程池中进行处理
     public void schedule(WorkRequest workRequest) {
         schedule(workRequest, 0);
     }
@@ -113,7 +114,7 @@ public class WorkerService {
             workRequest.cleanup();
             return;
         }
-
+        // 把请求再次封装
         ScheduledWorkRequest scheduledWorkRequest =
             new ScheduledWorkRequest(workRequest);
 
@@ -138,8 +139,9 @@ public class WorkerService {
             scheduledWorkRequest.run();
         }
     }
-
+    // 对请求的处理
     private class ScheduledWorkRequest implements Runnable {
+        // 封装了具体的请求
         private final WorkRequest workRequest;
 
         ScheduledWorkRequest(WorkRequest workRequest) {
@@ -154,6 +156,7 @@ public class WorkerService {
                     workRequest.cleanup();
                     return;
                 }
+                // ********************具体 network IO的处理
                 workRequest.doWork();
             } catch (Exception e) {
                 LOG.warn("Unexpected exception", e);

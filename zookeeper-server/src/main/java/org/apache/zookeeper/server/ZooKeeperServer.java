@@ -792,7 +792,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      */
     protected void setLocalSessionFlag(Request si) {
     }
-
+    // 对请求的处理
     public void submitRequest(Request si) {
         if (firstProcessor == null) {
             synchronized (this) {
@@ -814,8 +814,10 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         }
         try {
             touch(si.cnxn);
+            // 对请求类型的一个校验
             boolean validpacket = Request.isValid(si.type);
             if (validpacket) {
+                // 正确的请求类型  开始处理请求
                 firstProcessor.processRequest(si);
                 if (si.cnxn != null) {
                     incInProcess();
@@ -1082,7 +1084,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         }
         return false;
     }
-
+    // ************************
+    // 对接收到的数据  开始进行处理
     public void processPacket(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         // We have the request, now process and setup for next
         InputStream bais = new ByteBufferInputStream(incomingBuffer);
@@ -1093,6 +1096,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // pointing
         // to the start of the txn
         incomingBuffer = incomingBuffer.slice();
+        // 根据不同的消息类型  进行对应的处理
+        //1. auth 认证的处理
         if (h.getType() == OpCode.auth) {
             LOG.info("got auth packet " + cnxn.getRemoteSocketAddress());
             AuthPacket authPacket = new AuthPacket();
@@ -1115,6 +1120,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 LOG.info("auth success " + cnxn.getRemoteSocketAddress());
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0,
                         KeeperException.Code.OK.intValue());
+                // 响应客户端
                 cnxn.sendResponse(rh, null, null);
             } else {
                 if (ap == null) {
@@ -1127,6 +1133,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 // send a response...
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0,
                         KeeperException.Code.AUTHFAILED.intValue());
+                // ************************
+                // server端响应客户端
                 cnxn.sendResponse(rh, null, null);
                 // ... and close connection
                 cnxn.sendBuffer(ServerCnxnFactory.closeConn);
@@ -1134,6 +1142,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
             return;
         } else {
+            // 2.sasl的处理
             if (h.getType() == OpCode.sasl) {
                 Record rsp = processSasl(incomingBuffer,cnxn);
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0, KeeperException.Code.OK.intValue());
@@ -1141,15 +1150,21 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 return;
             }
             else {
+                // 3. 其他消息的处理
+                // 封装请求数据
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 si.setOwner(ServerCnxn.me);
                 // Always treat packet from the client as a possible
                 // local request.
                 setLocalSessionFlag(si);
+                // ******************************
+                // 提交请求,开始对请求进行处理
                 submitRequest(si);
             }
         }
+        // **********************
+        // 这里就开始机制进行数据的接收了,即 selectionKey不会设置read事件
         cnxn.incrOutstandingRequests(h);
     }
 
@@ -1205,16 +1220,21 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
 
     // entry point for FinalRequestProcessor.java
+    // 请求处理
     public ProcessTxnResult processTxn(Request request) {
         return processTxn(request, request.getHdr(), request.getTxn());
     }
-
+    // 请求处理
     private ProcessTxnResult processTxn(Request request, TxnHeader hdr,
                                         Record txn) {
         ProcessTxnResult rc;
+        // 获取操作类型
         int opCode = request != null ? request.type : hdr.getType();
+        // 获取sessionID
         long sessionId = request != null ? request.sessionId : hdr.getClientId();
         if (hdr != null) {
+            // ************************
+            // 请求处理
             rc = getZKDatabase().processTxn(hdr, txn);
         } else {
             rc = new ProcessTxnResult();

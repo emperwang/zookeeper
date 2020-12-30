@@ -92,12 +92,13 @@ class WatchManager {
             }
         }
     }
-
+    // 触发watcher机制
     Set<Watcher> triggerWatch(String path, EventType type) {
         return triggerWatch(path, type, null);
     }
-
+    // 触发watcher机制
     Set<Watcher> triggerWatch(String path, EventType type, Set<Watcher> supress) {
+        // 封装具体的事件
         WatchedEvent e = new WatchedEvent(type,
                 KeeperState.SyncConnected, path);
         HashSet<Watcher> watchers;
@@ -113,6 +114,7 @@ class WatchManager {
                 }
                 return null;
             }
+            // 移除对应的watcher
             for (Watcher w : watchers) {
                 HashSet<String> paths = watch2Paths.get(w);
                 if (paths != null) {
@@ -125,6 +127,7 @@ class WatchManager {
                 continue;
             }
             // watch的事件处理
+            // ******************************
             w.process(e);
         }
         return watchers;
