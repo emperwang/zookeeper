@@ -747,6 +747,7 @@ public class ClientCnxn {
         if (p.cb == null) {
             synchronized (p) {
                 p.finished = true;
+                // 唤醒那些等待packet返回的线程
                 p.notifyAll();
             }
         } else {
@@ -849,8 +850,9 @@ public class ClientCnxn {
                     incomingBuffer);
             BinaryInputArchive bbia = BinaryInputArchive.getArchive(bbis);
             ReplyHeader replyHdr = new ReplyHeader();
-
+            // 先反序列化 响应头
             replyHdr.deserialize(bbia, "header");
+            // 如果xid是-2, 则只是 ping操作
             if (replyHdr.getXid() == -2) {
                 // -2 is the xid for pings
                 if (LOG.isDebugEnabled()) {
@@ -862,6 +864,7 @@ public class ClientCnxn {
                 }
                 return;
             }
+            // 如果是 xid=-4, 则表示 是 auth 相关的
             if (replyHdr.getXid() == -4) {
                 // -4 is the xid for AuthPacket               
                 if(replyHdr.getErr() == KeeperException.Code.AUTHFAILED.intValue()) {
@@ -876,13 +879,16 @@ public class ClientCnxn {
                 }
                 return;
             }
+            // 如果xid是-1,则表示是 server端响应的事件
             if (replyHdr.getXid() == -1) {
                 // -1 means notification
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Got notification sessionid:0x"
                         + Long.toHexString(sessionId));
                 }
+                // 创建事件
                 WatcherEvent event = new WatcherEvent();
+                // 反序列化 事件
                 event.deserialize(bbia, "response");
 
                 // convert from a server path to a client path
@@ -898,13 +904,13 @@ public class ClientCnxn {
                     			+ chrootPath);
                     }
                 }
-
+                // 封装返回的事件
                 WatchedEvent we = new WatchedEvent(event);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Got " + we + " for sessionid 0x"
                             + Long.toHexString(sessionId));
                 }
-
+                // 把server返回的事件 放入到waitingEvents 缓存起来
                 eventThread.queueEvent( we );
                 return;
             }
@@ -933,6 +939,7 @@ public class ClientCnxn {
              * to the first request!
              */
             try {
+                // 请求头 和响应头的xid不一致, 则出错
                 if (packet.requestHeader.getXid() != replyHdr.getXid()) {
                     packet.replyHeader.setErr(
                             KeeperException.Code.CONNECTIONLOSS.intValue());
@@ -962,6 +969,7 @@ public class ClientCnxn {
                 }
             } finally {
                 // 在这里根据响应的结果,来进行watcher的是否注册
+                // ***************** 注册 watcher的操作
                 finishPacket(packet);
             }
         }
@@ -1111,7 +1119,7 @@ public class ClientCnxn {
         // Set to true if and only if constructor of ZooKeeperSaslClient
         // throws a LoginException: see startConnect() below.
         private boolean saslLoginFailed = false;
-
+        // 开始连接 server端
         private void startConnect(InetSocketAddress addr) throws IOException {
             // initializing it for new connection
             saslLoginFailed = false;
@@ -1587,6 +1595,8 @@ public class ClientCnxn {
             } else {
                 // Wait for request completion infinitely
                 while (!packet.finished) {
+                    // 当packet没有完成时,  对应的线程会等待
+                    // 当接收到server的响应后 会进行 notifyAll 唤醒操作
                     packet.wait();
                 }
             }

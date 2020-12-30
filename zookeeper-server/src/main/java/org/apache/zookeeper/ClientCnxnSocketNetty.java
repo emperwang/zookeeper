@@ -306,6 +306,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
             }
             if (head != null) {
                 // 真实发送
+                // **********************************
                 doWrite(pendingQueue, head, cnxn);
             }
         } finally {
@@ -388,6 +389,7 @@ public class ClientCnxnSocketNetty extends ClientCnxnSocket {
                     }
                 }
                 // 发送packet
+                // ************************
                 sendPktOnly(p);
                 anyPacketsSent = true;
             }

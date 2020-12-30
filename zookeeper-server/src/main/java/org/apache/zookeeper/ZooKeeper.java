@@ -266,7 +266,7 @@ public class ZooKeeper implements AutoCloseable {
         //key为path,value为对应的注册的watcher
         private final Map<String, Set<Watcher>> dataWatches =
             new HashMap<String, Set<Watcher>>();
-        //
+        // 监测节点 exists
         private final Map<String, Set<Watcher>> existWatches =
             new HashMap<String, Set<Watcher>>();
         // 监听器
@@ -583,6 +583,7 @@ public class ZooKeeper implements AutoCloseable {
                         watchers = new HashSet<Watcher>();
                         watches.put(clientPath, watchers);
                     }
+                    // 添加到 watcherManager中
                     watchers.add(watcher);
                 }
             }
@@ -2166,6 +2167,7 @@ public class ZooKeeper implements AutoCloseable {
         GetDataResponse response = new GetDataResponse();
         // 由cnxn 进行数据的发送
          // r即server返回的响应头
+         // 这里提交后,会调用wait函数,等待对应的数据返回; 当数据返回后,会调用notifyAll进行唤醒
         ReplyHeader r = cnxn.submitRequest(h, request, response, wcb);
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
@@ -2197,11 +2199,11 @@ public class ZooKeeper implements AutoCloseable {
      * @throws KeeperException If the server signals an error with a non-zero error code
      * @throws InterruptedException If the server transaction is interrupted.
      */
+
     public byte[] getData(String path, boolean watch, Stat stat)
             throws KeeperException, InterruptedException {
         return getData(path, watch ? watchManager.defaultWatcher : null, stat);
     }
-
     /**
      * The asynchronous version of getData.
      *
@@ -3094,7 +3096,7 @@ public class ZooKeeper implements AutoCloseable {
     protected SocketAddress testableLocalSocketAddress() {
         return cnxn.sendThread.getClientCnxnSocket().getLocalSocketAddress();
     }
-
+    // 创建客户端socket
     private ClientCnxnSocket getClientCnxnSocket() throws IOException {
         String clientCnxnSocketName = getClientConfig().getProperty(
                 ZKClientConfig.ZOOKEEPER_CLIENT_CNXN_SOCKET);

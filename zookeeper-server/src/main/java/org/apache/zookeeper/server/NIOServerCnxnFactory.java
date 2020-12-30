@@ -403,6 +403,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory {
          * reads/sets are potentially blocking operations if other select
          * operations are happening.
          */
+        // 把selectionKey添加到updateQueue中 准备更新其 感兴趣事件
         public boolean addInterestOpsUpdateRequest(SelectionKey sk) {
             if (stopped || !updateQueue.offer(sk)) {
                 return false;
