@@ -105,7 +105,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * should never be used otherwise
      */
     private static  boolean failCreate = false;
-
+    // 缓存其他 learner发送过来的请求
     LinkedBlockingQueue<Request> submittedRequests = new LinkedBlockingQueue<Request>();
 
     private final RequestProcessor nextProcessor;
@@ -127,6 +127,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     public static void setFailCreate(boolean b) {
         failCreate = b;
     }
+    // 处理从其他 peer发送过来的请求
     @Override
     public void run() {
         try {
@@ -902,6 +903,9 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
             }
         }
         request.zxid = zks.getZxid();
+        // ********************
+        // 前面处理完 交由下一个处理器处理
+        //**********************
         nextProcessor.processRequest(request);
     }
 
@@ -998,7 +1002,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         }
         return rv;
     }
-
+    // 把请求缓存起来
     public void processRequest(Request request) {
         submittedRequests.add(request);
     }

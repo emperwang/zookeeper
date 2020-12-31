@@ -67,9 +67,9 @@ public class Request {
     public final ByteBuffer request;
 
     public final ServerCnxn cnxn;
-
+    // 事务头
     private TxnHeader hdr;
-
+    // 封装具体的记录信息,这里写 txn,表示事务
     private Record txn;
 
     public long zxid = -1;

@@ -391,9 +391,11 @@ public class FileTxnSnapLog {
             ConcurrentHashMap<Long, Integer> sessionsWithTimeouts)
         throws IOException {
         long lastZxid = dataTree.lastProcessedZxid;
+        // 生成快照文件
         File snapshotFile = new File(snapDir, Util.makeSnapshotName(lastZxid));
         LOG.info("Snapshotting: 0x{} to {}", Long.toHexString(lastZxid),
                 snapshotFile);
+        // 把数据 序列化到文件中
         snapLog.serialize(dataTree, sessionsWithTimeouts, snapshotFile);
 
     }

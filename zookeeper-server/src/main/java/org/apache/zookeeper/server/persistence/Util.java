@@ -266,7 +266,7 @@ public class Util {
             this.prefix = prefix;
             this.ascending = ascending;
         }
-
+        // 文件排序方式,对比后面的 zxid
         public int compare(File o1, File o2) {
             long z1 = Util.getZxidFromName(o1.getName(), prefix);
             long z2 = Util.getZxidFromName(o2.getName(), prefix);

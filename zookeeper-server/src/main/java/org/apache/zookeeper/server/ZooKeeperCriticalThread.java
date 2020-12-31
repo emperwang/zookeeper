@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
  * Represents critical thread. When there is an uncaught exception thrown by the
  * thread this will exit the system.
  */
+// 当出现意外时 ZooKeeperCriticalThread会停止system
 public class ZooKeeperCriticalThread extends ZooKeeperThread {
     private static final Logger LOG = LoggerFactory
             .getLogger(ZooKeeperCriticalThread.class);

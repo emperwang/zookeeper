@@ -134,6 +134,7 @@ public class FinalRequestProcessor implements RequestProcessor {
 
             // do not add non quorum packets to the queue.
             if (request.isQuorum()) {
+                // 把请求提交到 committedProposal中 准备扩散到 peer中
                 zks.getZKDatabase().addCommittedProposal(request);
             }
         }

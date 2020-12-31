@@ -134,6 +134,7 @@ public class LeaderZooKeeperServer extends QuorumZooKeeperServer {
      *
      * @param request
      */
+    // 提交请求
     public void submitLearnerRequest(Request request) {
         /*
          * Requests coming from the learner should have gone through

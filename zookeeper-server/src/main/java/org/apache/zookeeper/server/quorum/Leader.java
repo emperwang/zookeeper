@@ -101,6 +101,8 @@ public class Leader {
     volatile LearnerCnxAcceptor cnxAcceptor = null;
 
     // list of all the followers
+    // 记录此leader启动的 LearnerHandler
+    // LearnerHandler是处理各个 peer(即follower) 通信的
     private final HashSet<LearnerHandler> learners =
         new HashSet<LearnerHandler>();
 
@@ -404,6 +406,7 @@ public class Leader {
                         BufferedInputStream is = new BufferedInputStream(
                                 s.getInputStream());
                         // 创建一个线程  来处理接收到的 其他server的 learnerInfo
+                        // ****************************
                         LearnerHandler fh = new LearnerHandler(s, is, Leader.this);
                         fh.start();
                     } catch (SocketException e) {
@@ -852,6 +855,7 @@ public class Leader {
      * @param sid, the id of the server that sent the ack
      * @param followerAddr
      */
+    // 处理响应
     synchronized public void processAck(long sid, long zxid, SocketAddress followerAddr) {        
         if (!allowedToCommit) return; // last op committed was a leader change - from now on 
                                      // the new leader should commit        
@@ -1184,6 +1188,7 @@ public class Leader {
                 // commit message also
                 QuorumPacket qp = new QuorumPacket(Leader.COMMIT, p.packet
                         .getZxid(), null, null);
+                // 提交请求
                 handler.queuePacket(qp);
             }
             // Only participant need to get outstanding proposals
@@ -1268,6 +1273,7 @@ public class Leader {
                 }
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
+            // verifier.containsQuorum  半数机制
             if (electingFollowers.contains(self.getId()) && verifier.containsQuorum(electingFollowers)) {
                 electionFinished = true;
                 electingFollowers.notifyAll();
@@ -1328,7 +1334,8 @@ public class Leader {
         if (designatedLeader != self.getId()) {
             allowedToCommit = false;
         }
-        
+        // *************************
+        // 启动很多重要的线程 其中就包括和其他peer沟通的线程
         zk.startup();
         /*
          * Update the election vote here to ensure that all members of the

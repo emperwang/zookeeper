@@ -88,6 +88,8 @@ public class FileSnap implements SnapShot {
             try (InputStream snapIS = new BufferedInputStream(new FileInputStream(snap));
                  CheckedInputStream crcIn = new CheckedInputStream(snapIS, new Adler32())) {
                 InputArchive ia = BinaryInputArchive.getArchive(crcIn);
+                // 反序列化文件中的数据
+                // 由此可以看到文件中存储 1. 当时的内存树  2. session 3. crc校验
                 deserialize(dt, sessions, ia);
                 long checkSum = crcIn.getChecksum().getValue();
                 long val = ia.readLong("val");
@@ -155,12 +157,14 @@ public class FileSnap implements SnapShot {
         // 从快照目录中找到文件,并进行排序,排序按照目录 snapshot. 之后的数字
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
+        // 存储最后的有效文件
         List<File> list = new ArrayList<File>();
         for (File f : files) {
             // we should catch the exceptions
             // from the valid snapshot and continue
             // until we find a valid one
             try {
+                // 校验文件是否是有效的
                 if (Util.isValidSnapshot(f)) {
                     list.add(f);
                     count++;
@@ -205,6 +209,7 @@ public class FileSnap implements SnapShot {
      * @param header the header of this snapshot
      * @throws IOException
      */
+    // 序列化数据到 snapshot 快照文件中
     protected void serialize(DataTree dt,Map<Long, Integer> sessions,
             OutputArchive oa, FileHeader header) throws IOException {
         // this is really a programmatic error and not something that can

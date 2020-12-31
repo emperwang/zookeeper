@@ -190,6 +190,7 @@ public class QuorumPeerMain {
           quorumPeer.setConfigFileName(config.getConfigFilename());
           // 数据树 除了在磁盘有一份保存外,还有一份在 内存中有一个信息树
           // 此处就是创建 内存中的数据树
+          // *************************************
           quorumPeer.setZKDatabase(new ZKDatabase(quorumPeer.getTxnFactory()));
           // getQuorumVerifier此属性很重要,记录了集群中的其他节点的信息,以及各个节点的角色
           // 使用AddressTuple 记录地址

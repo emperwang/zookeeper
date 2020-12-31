@@ -256,6 +256,7 @@ public class FileTxnLog implements TxnLog {
         // zxid of the snapshot
         for (File f : files) {
             long fzxid = Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX);
+            // 大于snapshotZxid都不处理
             if (fzxid > snapshotZxid) {
                 continue;
             }
@@ -271,6 +272,7 @@ public class FileTxnLog implements TxnLog {
             if (fzxid < logZxid) {
                 continue;
             }
+            // 记录下来那些 大于logZxid的文件
             v.add(f);
         }
         return v.toArray(new File[0]);
@@ -281,8 +283,11 @@ public class FileTxnLog implements TxnLog {
      * get the last zxid that was logged in the transaction logs
      * @return the last zxid logged in the transaction logs
      */
+    // 获取上次的log zxid
     public long getLastLoggedZxid() {
+        // 有效的日志文件,同样是按照zxid排序 获取
         File[] files = getLogFiles(logDir.listFiles(), 0);
+        // 最大的 log
         long maxLog=files.length>0?
                 Util.getZxidFromName(files[files.length-1].getName(),LOG_FILE_PREFIX):-1;
 
@@ -292,6 +297,7 @@ public class FileTxnLog implements TxnLog {
         TxnIterator itr = null;
         try {
             FileTxnLog txn = new FileTxnLog(logDir);
+            // 读取log中的文件
             itr = txn.read(maxLog);
             while (true) {
                 if(!itr.next())
@@ -587,10 +593,12 @@ public class FileTxnLog implements TxnLog {
             storedFiles = new ArrayList<File>();
             List<File> files = Util.sortDataDir(FileTxnLog.getLogFiles(logDir.listFiles(), 0), LOG_FILE_PREFIX, false);
             for (File f: files) {
+                // 保存所有大于zxid的文件
                 if (Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX) >= zxid) {
                     storedFiles.add(f);
                 }
                 // add the last logfile that is less than the zxid
+                // 保存到上次小于 zxid文件就停止
                 else if (Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX) < zxid) {
                     storedFiles.add(f);
                     break;

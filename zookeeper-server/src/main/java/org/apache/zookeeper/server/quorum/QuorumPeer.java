@@ -986,6 +986,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 throw new IOException("The current epoch, " + ZxidUtils.zxidToString(currentEpoch) + ", is older than the last zxid, " + lastProcessedZxid);
             }
             try {
+                // 已经接受的 epoch
                 acceptedEpoch = readLongFromFile(ACCEPTED_EPOCH_FILENAME);
             } catch(FileNotFoundException e) {
             	// pick a reasonable epoch number

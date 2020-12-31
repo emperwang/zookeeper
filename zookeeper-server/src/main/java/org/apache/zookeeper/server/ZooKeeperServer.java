@@ -99,6 +99,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     protected int maxSessionTimeout = -1;
     protected SessionTracker sessionTracker;
     private FileTxnSnapLog txnLogFactory = null;
+    // 内存中的数据库
     private ZKDatabase zkDb;
     private final AtomicLong hzxid = new AtomicLong(0);
     public final static Exception ok = new Exception("No prob");

@@ -85,7 +85,9 @@ public class ZKDatabase {
 
     public static final int commitLogCount = 500;
     protected static int commitLogBuffer = 700;
+    // 记录 proposal, 如: commitProposal 等
     protected LinkedList<Proposal> committedLog = new LinkedList<Proposal>();
+    // 读写锁
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
     volatile private boolean initialized = false;
 
@@ -97,8 +99,9 @@ public class ZKDatabase {
      */
     public ZKDatabase(FileTxnSnapLog snapLog) {
         // 创建内存树
+        // ***********************************
         dataTree = createDataTree();
-        //
+        // 记录session, 超时检测
         sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
         this.snapLog = snapLog;
 
@@ -267,10 +270,13 @@ public class ZKDatabase {
      * fast follower synchronization.
      * @param request committed request
      */
+    // 添加提交commit Proposal
     public void addCommittedProposal(Request request) {
+        // 写锁
         WriteLock wl = logLock.writeLock();
         try {
             wl.lock();
+            // 如果 committedLog数量过大,则移除第一个
             if (committedLog.size() > commitLogCount) {
                 committedLog.removeFirst();
                 minCommittedLog = committedLog.getFirst().packet.getZxid();
@@ -279,12 +285,14 @@ public class ZKDatabase {
                 minCommittedLog = request.zxid;
                 maxCommittedLog = request.zxid;
             }
-
+            // 把request 序列化
             byte[] data = SerializeUtils.serializeRequest(request);
+            // 把 请求封装为 QuorumPacket,类型为 Leader.PROPOSAL
             QuorumPacket pp = new QuorumPacket(Leader.PROPOSAL, request.zxid, data, null);
             Proposal p = new Proposal();
             p.packet = pp;
             p.request = request;
+            // 把packet 缓存起来
             committedLog.add(p);
             maxCommittedLog = p.packet.getZxid();
         } finally {
