@@ -333,6 +333,7 @@ public class Leader {
 
                         BufferedInputStream is = new BufferedInputStream(
                                 s.getInputStream());
+                        // 每一个 follower在 leader这里就对应一个 LearnerHandler 处理器
                         LearnerHandler fh = new LearnerHandler(s, is, Leader.this);
                         fh.start();
                     } catch (SocketException e) {
@@ -375,6 +376,7 @@ public class Leader {
      */
     void lead() throws IOException, InterruptedException {
         self.end_fle = Time.currentElapsedTime();
+        // 计算选举花费的时间
         long electionTimeTaken = self.end_fle - self.start_fle;
         self.setElectionTimeTaken(electionTimeTaken);
         LOG.info("LEADING - LEADER ELECTION TOOK - {}", electionTimeTaken);
@@ -391,6 +393,7 @@ public class Leader {
 
             // Start thread that waits for connection requests from 
             // new followers.
+            // 创建接收 follower 请求的服务端
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
             
@@ -435,7 +438,7 @@ public class Leader {
                 self.tick.incrementAndGet();
                 return;
             }
-            
+            // 处理器链创建 vote更新
             startZkServer();
             
             /**

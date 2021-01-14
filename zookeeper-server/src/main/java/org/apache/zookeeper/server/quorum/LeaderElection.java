@@ -154,6 +154,7 @@ public class LeaderElection implements Election  {
         }
 
         try {
+            // 设置当前选票
             self.setCurrentVote(new Vote(self.getId(),
                     self.getLastLoggedZxid()));
             // We are going to look for a leader by casting a vote for ourself

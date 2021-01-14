@@ -412,11 +412,14 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         if (sessionTracker == null) {
             createSessionTracker();
         }
+        // 检测session过去
         startSessionTracker();
+        // 创建处理器链
+        // 根据 角色的不同 leader  follower之间的不同 创建不同的处理器链
         setupRequestProcessors();
 
         registerJMX();
-
+        // 设置当前的实例状态
         setState(State.RUNNING);
         notifyAll();
     }

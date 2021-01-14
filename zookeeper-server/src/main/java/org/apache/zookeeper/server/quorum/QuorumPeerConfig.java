@@ -63,14 +63,18 @@ public class QuorumPeerConfig {
     protected int electionAlg = 3;
     protected int electionPort = 2182;
     protected boolean quorumListenOnAllIPs = false;
+    // 记录participant 类型的节点信息
     protected final HashMap<Long,QuorumServer> servers =
         new HashMap<Long, QuorumServer>();
+    // 记录observer 类型的节点信息
     protected final HashMap<Long,QuorumServer> observers =
         new HashMap<Long, QuorumServer>();
 
     protected long serverId;
     protected HashMap<Long, Long> serverWeight = new HashMap<Long, Long>();
+    // 分组信息: key 为sid, value为 gid
     protected HashMap<Long, Long> serverGroup = new HashMap<Long, Long>();
+    // 分组的数量
     protected int numGroups = 0;
     protected QuorumVerifier quorumVerifier;
     protected int snapRetainCount = 3;
@@ -148,7 +152,7 @@ public class QuorumPeerConfig {
             } finally {
                 in.close();
             }
-
+        // 解析配置文件
             parseProperties(cfg);
         } catch (IOException e) {
             throw new ConfigException("Error processing " + path, e);
@@ -219,10 +223,14 @@ public class QuorumPeerConfig {
                        " or host:port:port:type");
                 }
                 LearnerType type = null;
+                // 主机地址
                 String hostname = parts[0];
+                // server监听的端口对应  clientPort一般为2181
+                // 这里的是 follower leader之间通信的端口
                 Integer port = Integer.parseInt(parts[1]);
                 Integer electionPort = null;
                 if (parts.length > 2){
+                    // follower  leader 之间选举的端口
                 	electionPort=Integer.parseInt(parts[2]);
                 }
                 if (parts.length > 3){
@@ -242,7 +250,7 @@ public class QuorumPeerConfig {
             } else if (key.startsWith("group")) {
                 int dot = key.indexOf('.');
                 long gid = Long.parseLong(key.substring(dot + 1));
-
+                // 分组数量
                 numGroups++;
 
                 String parts[] = value.split(":");
@@ -250,13 +258,14 @@ public class QuorumPeerConfig {
                     long sid = Long.parseLong(s);
                     if(serverGroup.containsKey(sid))
                         throw new ConfigException("Server " + sid + "is in multiple groups");
-                    else
+                    else // 保存分组的信息
                         serverGroup.put(sid, gid);
                 }
 
             } else if(key.startsWith("weight")) {
                 int dot = key.indexOf('.');
                 long sid = Long.parseLong(key.substring(dot + 1));
+                // 保存每个sid对应的weight
                 serverWeight.put(sid, Long.parseLong(value));
             } else if (key.equals(QuorumAuth.QUORUM_SASL_AUTH_ENABLED)) {
                 quorumEnableSasl = Boolean.parseBoolean(value);
@@ -315,6 +324,7 @@ public class QuorumPeerConfig {
         if (clientPort == 0) {
             throw new IllegalArgumentException("clientPort is not set");
         }
+        // 创建 zk对外服务的地址
         if (clientPortAddress != null) {
             this.clientPortAddress = new InetSocketAddress(
                     InetAddress.getByName(clientPortAddress), clientPort);
@@ -416,6 +426,7 @@ public class QuorumPeerConfig {
                 br.close();
             }
             try {
+                // serverId 对应 myid文件中的设置
                 serverId = Long.parseLong(myIdString);
                 MDC.put("myid", myIdString);
             } catch (NumberFormatException e) {

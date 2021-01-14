@@ -130,6 +130,7 @@ public class QuorumPeerMain {
       LOG.info("Starting quorum peer");
       try {
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
+          // 此时zk对外服务的连接 2181 端口
           cnxnFactory.configure(config.getClientPortAddress(),
                                 config.getMaxClientCnxns());
 
@@ -150,6 +151,7 @@ public class QuorumPeerMain {
           quorumPeer.setClientPortAddress(config.getClientPortAddress());
           quorumPeer.setMinSessionTimeout(config.getMinSessionTimeout());
           quorumPeer.setMaxSessionTimeout(config.getMaxSessionTimeout());
+          // 内存数据库
           quorumPeer.setZKDatabase(new ZKDatabase(quorumPeer.getTxnFactory()));
           quorumPeer.setLearnerType(config.getPeerType());
           quorumPeer.setSyncEnabled(config.getSyncEnabled());
