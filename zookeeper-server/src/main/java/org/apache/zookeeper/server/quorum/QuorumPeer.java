@@ -873,6 +873,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
 
     public QuorumPeer() throws SaslException {
         super("QuorumPeer");    // 设置线程的名字
+        // 此表示了当前 zk实例的状态
         quorumStats = new QuorumStats(this);
         jmxRemotePeerBean = new HashMap<Long, RemotePeerBean>();
         // 反射创建org.apache.zookeeper.server.admin.JettyAdminServer

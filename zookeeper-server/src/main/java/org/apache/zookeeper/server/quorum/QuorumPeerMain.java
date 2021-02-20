@@ -135,7 +135,8 @@ public class QuorumPeerMain {
             ZooKeeperServerMain.main(args);
         }
     }
-
+    // 即从配置开始运行
+    // 即把读取到的配置 设置到 QuorumPeer中,并开始了真正的运行
     public void runFromConfig(QuorumPeerConfig config)
             throws IOException, AdminServerException
     {
