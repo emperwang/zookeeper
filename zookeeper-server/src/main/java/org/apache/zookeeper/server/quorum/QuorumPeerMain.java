@@ -129,13 +129,14 @@ public class QuorumPeerMain {
   
       LOG.info("Starting quorum peer");
       try {
+          // 这里创建了对外服务的 socket 配置
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
           // 此时zk对外服务的连接 2181 端口
           cnxnFactory.configure(config.getClientPortAddress(),
                                 config.getMaxClientCnxns());
-
+            // 这里获取 QuorumPeer,抽象的可以认为 QuorumPeer就表示一个当前的zk 实例
           quorumPeer = getQuorumPeer();
-
+          // 下面把解析到的配置设置到 quorumPeer中
           quorumPeer.setQuorumPeers(config.getServers());
           quorumPeer.setTxnFactory(new FileTxnSnapLog(
                   new File(config.getDataLogDir()),
@@ -178,6 +179,7 @@ public class QuorumPeerMain {
     }
 
     // @VisibleForTesting
+    // 创建 QuorumPeer
     protected QuorumPeer getQuorumPeer() throws SaslException {
         return new QuorumPeer();
     }

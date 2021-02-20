@@ -27,7 +27,10 @@ public class QuorumStats {
         static public final String LEADING_STATE = "leading";
         static public final String FOLLOWING_STATE = "following";
         static public final String OBSERVING_STATE = "observing";
+        // 返回集群中 其他follower observer的地址
+        // 针对进行了同步的follower 或 observer其地址后会添加一个 *
         public String[] getQuorumPeers();
+        // 获取当前实例的状态
         public String getServerState();
     }
     

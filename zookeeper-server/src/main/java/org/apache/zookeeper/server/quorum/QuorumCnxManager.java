@@ -124,8 +124,10 @@ public class QuorumCnxManager {
      * Mapping from Peer to Thread number
      */
     // 记录对应每个server的发送线程
+    // key为每个zk实例的myId value为 具体发送socket输出流
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
     // 对应每个server的发送队列
+    // key为 zk实例的myId  value为 发送队列
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
     // 对应每个server的上次发送的信息
     final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent;
@@ -189,7 +191,7 @@ public class QuorumCnxManager {
                             int quorumCnxnThreadsSize,
                             boolean quorumSaslAuthEnabled,
                             ConcurrentHashMap<Long, SendWorker> senderWorkerMap) {
-        // 记录发型worker的容器
+        // 记录发送消息worker的容器
         this.senderWorkerMap = senderWorkerMap;
         // 接收队列
         this.recvQueue = new ArrayBlockingQueue<Message>(RECV_CAPACITY);
@@ -212,7 +214,10 @@ public class QuorumCnxManager {
                 quorumSaslAuthEnabled);
 
         // Starts listener thread that waits for connection requests
-        // 创建选举接收的线程
+        // 此listener 会接收 或者 创建到其他zk实例的连接
+        // 并利用创建的socket连接,创建具体的消息发送者 sendWorker  消息接收recvWorker 线程
+        // 并启动对应的接收和发送线程
+        // 这里创建好之后,就会leader选举 做好了准备(发送选票等信息)
         listener = new Listener();
     }
 
@@ -272,6 +277,8 @@ public class QuorumCnxManager {
      */
     public void initiateConnection(final Socket sock, final Long sid) {
         try {
+            // 开始连接
+            // 此会创建对应此 sid的 sendWorker 和 recvWorker线程,并且启动
             startConnection(sock, sid);
         } catch (IOException e) {
             LOG.error("Exception while connecting, id: {}, addr: {}, closing learner connection",
@@ -367,7 +374,7 @@ public class QuorumCnxManager {
             // 此处的finish就会关闭 和对端的 发送和接收线程
             if(vsw != null)
                 vsw.finish();
-            
+            // 记录对应的发送线程 以及 记录对应的消息发送队列
             senderWorkerMap.put(sid, sw);
             queueSendMap.putIfAbsent(sid, new ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY));
             
@@ -390,9 +397,13 @@ public class QuorumCnxManager {
     public void receiveConnection(final Socket sock) {
         DataInputStream din = null;
         try {
+            // 获取数据流
             din = new DataInputStream(
                     new BufferedInputStream(sock.getInputStream()));
             // 处理接收
+            // 这里根据接收的socket 创建了 发送消息的sendWorker  接收消息的 RecvWorker线程 并启动
+            // 并且 如果对端的 myId小于自己的myId,则关闭此连接
+            // 即 连接时 是 MyId大的连接myId小的
             handleConnection(sock, din);
         } catch (IOException e) {
             LOG.error("Exception handling connection, addr: {}, closing server connection",
@@ -483,6 +494,9 @@ public class QuorumCnxManager {
              * up, so we have to shut down the workers before trying to open a
              * new connection.
              */
+            // 查看是否有 此 myid对应的 发送worker
+            // 如果有,则关闭,
+            // 即 只允许 myid大的连接 myid小的 zk实例
             SendWorker sw = senderWorkerMap.get(sid);
             if (sw != null) {
                 sw.finish();
@@ -499,18 +513,22 @@ public class QuorumCnxManager {
 
             // Otherwise start worker threads to receive data.
         } else {
+            // 创建发送 SendWorker
             SendWorker sw = new SendWorker(sock, sid);
+            // 创建具体接收消息的线程
             RecvWorker rw = new RecvWorker(sock, din, sid, sw);
+            // 把接收worker 注入到 发送worker中
             sw.setRecv(rw);
-
+            //
             SendWorker vsw = senderWorkerMap.get(sid);
             
             if(vsw != null)
                 vsw.finish();
-            
+            // 记录 发送worker
             senderWorkerMap.put(sid, sw);
+            // 创建 此myid实例对应的 消息队列
             queueSendMap.putIfAbsent(sid, new ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY));
-            
+            // 启动线程
             sw.start();
             rw.start();
             
@@ -545,8 +563,8 @@ public class QuorumCnxManager {
              } else {
                  addToSendQueue(bq, b);
              }
+             // 开始连接此sid的实例
              connectOne(sid);
-                
         }
     }
     
@@ -555,6 +573,7 @@ public class QuorumCnxManager {
      * 
      *  @param sid  server id
      */
+    // leader竞选开始,开始连接其他的zk实例
     synchronized public void connectOne(long sid){
         if (!connectedToPeer(sid)){
             InetSocketAddress electionAddr;
@@ -743,6 +762,7 @@ public class QuorumCnxManager {
                     ss.setReuseAddress(true);
                     // 创建选举的地址
                     if (listenOnAllIPs) {
+                        // 获取当前 zk实例的选举监听端口号
                         int port = view.get(QuorumCnxManager.this.mySid)
                             .electionAddr.getPort();
                         addr = new InetSocketAddress(port);
@@ -751,13 +771,17 @@ public class QuorumCnxManager {
                             .electionAddr;
                     }
                     LOG.info("My election bind port: " + addr.toString());
+                    // 设置线程名字
                     setName(view.get(QuorumCnxManager.this.mySid)
                             .electionAddr.toString());
                     // serverSocket的地址绑定
+                    // 即 绑定到 选举地址
                     ss.bind(addr);
                     while (!shutdown) {
-                        // 开始客户端的接收
+                        // 等待接收其他 zk实例的连接
+                        // 这里会进行阻塞, 故不会占用太多资源
                         Socket client = ss.accept();
+                        // 对接收到的连接进行一些配置
                         setSockOpts(client);
                         LOG.info("Received connection request "
                                 + client.getRemoteSocketAddress());
@@ -771,6 +795,7 @@ public class QuorumCnxManager {
                             receiveConnectionAsync(client);
                         } else {
                             // 处理接收到的客户端
+                            // 对接收到的连接进行处理
                             receiveConnection(client);
                         }
 
@@ -1139,6 +1164,7 @@ public class QuorumCnxManager {
      */
     public void addToRecvQueue(Message msg) {
         synchronized(recvQLock) {
+            // 如果队列满了,则删除 oldest 的消息
             if (recvQueue.remainingCapacity() == 0) {
                 try {
                     recvQueue.remove();
@@ -1149,6 +1175,7 @@ public class QuorumCnxManager {
                 }
             }
             try {
+                // 把消息添加到 接收队列中
                 recvQueue.add(msg);
             } catch (IllegalStateException ie) {
                 // This should never happen

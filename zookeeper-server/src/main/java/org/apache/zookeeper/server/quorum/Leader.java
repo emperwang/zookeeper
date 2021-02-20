@@ -87,12 +87,14 @@ public class Leader {
     LearnerCnxAcceptor cnxAcceptor;
     
     // list of all the followers
+    //表示当前是leader 记录 当前集群中的其他follower observer
     private final HashSet<LearnerHandler> learners =
         new HashSet<LearnerHandler>();
 
     /**
      * Returns a copy of the current learner snapshot
      */
+    // 获取当前集群中其他follower observer的handler
     public List<LearnerHandler> getLearners() {
         synchronized (learners) {
             return new ArrayList<LearnerHandler>(learners);
@@ -100,6 +102,7 @@ public class Leader {
     }
 
     // list of followers that are ready to follow (i.e synced with the leader)
+    // 此记录集群中 已经和 leader进行了同步的 follower
     private final HashSet<LearnerHandler> forwardingFollowers =
         new HashSet<LearnerHandler>();
 
@@ -181,7 +184,7 @@ public class Leader {
             observingLearners.remove(peer);
         }
     }
-
+        // 判断一个 follower 或 observer 是否进行了同步
     boolean isLearnerSynced(LearnerHandler peer){
         synchronized (forwardingFollowers) {
             return forwardingFollowers.contains(peer);
