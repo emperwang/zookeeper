@@ -168,8 +168,9 @@ public class QuorumPeerMain {
           }
 
           quorumPeer.setQuorumCnxnThreadsSize(config.quorumCnxnThreadsSize);
+          // 认证相关额初始化
           quorumPeer.initialize();
-
+            // 实例启动开始
           quorumPeer.start();
           quorumPeer.join();
       } catch (InterruptedException e) {

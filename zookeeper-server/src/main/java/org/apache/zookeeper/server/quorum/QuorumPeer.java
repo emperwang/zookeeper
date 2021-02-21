@@ -638,7 +638,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     QuorumStats quorumStats() {
         return quorumStats;
     }
-    
+    // zk实例的启动
     @Override
     public synchronized void start() {
         // 加载 内存数据库
@@ -715,6 +715,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         responder.running = false;
         responder.interrupt();
     }
+    // 开始leader的选举
     synchronized public void startLeaderElection() {
     	try {
     	    // 创建当前初始的选票

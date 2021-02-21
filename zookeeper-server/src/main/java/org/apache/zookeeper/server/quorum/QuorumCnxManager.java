@@ -336,7 +336,7 @@ public class QuorumCnxManager {
             }
         }
     }
-
+    // 开始连接
     private boolean startConnection(Socket sock, Long sid)
             throws IOException {
         DataOutputStream dout = null;
@@ -635,7 +635,7 @@ public class QuorumCnxManager {
      * Try to establish a connection with each server if one
      * doesn't exist.
      */
-    
+    // 连接其他所有的zk实例
     public void connectAll(){
         long sid;
         for(Enumeration<Long> en = queueSendMap.keys();
