@@ -443,7 +443,10 @@ public class QuorumCnxManager {
             receiveConnection(sock);
         }
     }
-
+    // 处理接收
+    // 这里根据接收的socket 创建了 发送消息的sendWorker  接收消息的 RecvWorker线程 并启动
+    // 并且 如果对端的 myId小于自己的myId,则关闭此连接
+    // 即 连接时 是 MyId大的连接myId小的
     private void handleConnection(Socket sock, DataInputStream din)
             throws IOException {
         Long sid = null;
@@ -970,9 +973,11 @@ public class QuorumCnxManager {
 
                     ByteBuffer b = null;
                     try {
+                        // 先获取到 此zk实例对应的 发送队列
                         ArrayBlockingQueue<ByteBuffer> bq = queueSendMap
                                 .get(sid);
                         if (bq != null) {
+                            // 去队列中 获取要发送的数据
                             b = pollSendQueue(bq, 1000, TimeUnit.MILLISECONDS);
                         } else {
                             LOG.error("No queue of incoming messages for " +
@@ -981,7 +986,9 @@ public class QuorumCnxManager {
                         }
 
                         if(b != null){
+                            // 记录本次发送的数据
                             lastMessageSent.put(sid, b);
+                            // 数据发送
                             send(b);
                         }
                     } catch (InterruptedException e) {
@@ -1054,6 +1061,7 @@ public class QuorumCnxManager {
                      * Reads the first int to determine the length of the
                      * message
                      */
+                    // 先读取数据的长度
                     int length = din.readInt();
                     if (length <= 0 || length > PACKETMAXSIZE) {
                         throw new IOException(
@@ -1063,8 +1071,11 @@ public class QuorumCnxManager {
                     /**
                      * Allocates a new ByteBuffer to receive the message
                      */
+                    // 创建一个数组  来准备缓存读取的数据
                     byte[] msgArray = new byte[length];
+                    // 从socket中读取数据
                     din.readFully(msgArray, 0, length);
+                    // 包装信息
                     ByteBuffer message = ByteBuffer.wrap(msgArray);
                     // 这里接收到数据后 统一放入到接收队列中, 没有分开处理
                     addToRecvQueue(new Message(message.duplicate(), sid));

@@ -125,8 +125,10 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     static final private long superSecret = 0XB3415C00L;
 
     private final AtomicInteger requestsInProcess = new AtomicInteger(0);
+    // 要输出的记录
     final List<ChangeRecord> outstandingChanges = new ArrayList<ChangeRecord>();
     // this data structure must be accessed under the outstandingChanges lock
+    // key为path, value为 Record,即 更新对应path的记录
     final HashMap<String, ChangeRecord> outstandingChangesForPath =
         new HashMap<String, ChangeRecord>();
     
@@ -297,7 +299,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             killSession(session, zkDb.getDataTreeLastProcessedZxid());
         }
     }
-
+    // 为db 做快照
     public void takeSnapshot(){
 
         try {
@@ -412,7 +414,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         if (sessionTracker == null) {
             createSessionTracker();
         }
-        // 检测session过去
+        // 检测session 是否过期
         startSessionTracker();
         // 创建处理器链
         // 根据 角色的不同 leader  follower之间的不同 创建不同的处理器链
@@ -634,6 +636,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      * @param owner the owner of the session
      * @throws SessionExpiredException
      */
+    // 设置session的拥有者
     public void setOwner(long id, Object owner) throws SessionExpiredException {
         sessionTracker.setOwner(id, owner);
     }
@@ -727,7 +730,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         Request si = new Request(cnxn, sessionId, xid, type, bb, authInfo);
         submitRequest(si);
     }
-    
+        // 提交请求到 server
     public void submitRequest(Request si) {
         if (firstProcessor == null) {
             synchronized (this) {
@@ -1024,6 +1027,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 si.setOwner(ServerCnxn.me);
+                // 提交信息 给处理器链 处理
                 submitRequest(si);
             }
         }
@@ -1074,9 +1078,13 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     
     public ProcessTxnResult processTxn(TxnHeader hdr, Record txn) {
         ProcessTxnResult rc;
+        // 操作码
         int opCode = hdr.getType();
+        // sessionId
         long sessionId = hdr.getClientId();
+        // 处理事务
         rc = getZKDatabase().processTxn(hdr, txn);
+        // 创建 session
         if (opCode == OpCode.createSession) {
             if (txn instanceof CreateSessionTxn) {
                 CreateSessionTxn cst = (CreateSessionTxn) txn;
@@ -1087,6 +1095,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                         + txn.getClass() + " "
                         + txn.toString());
             }
+            // 关闭session
         } else if (opCode == OpCode.closeSession) {
             sessionTracker.removeSession(sessionId);
         }

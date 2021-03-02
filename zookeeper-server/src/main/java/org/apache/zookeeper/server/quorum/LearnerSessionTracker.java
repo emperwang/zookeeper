@@ -31,7 +31,7 @@ import org.apache.zookeeper.server.ZooKeeperServerListener;
  * to be forwarded to the Leader using a PING.
  */
 public class LearnerSessionTracker implements SessionTracker {
-
+    // 存放对应的 session超时消息
     HashMap<Long, Integer> touchTable = new HashMap<Long, Integer>();
     long serverId = 1;
     long nextSessionId=0;
@@ -59,7 +59,7 @@ public class LearnerSessionTracker implements SessionTracker {
         sessionsWithTimeouts.put(sessionId, sessionTimeout);
         touchTable.put(sessionId, sessionTimeout);
     }
-
+        // 更新session的超时时间
     synchronized public boolean touchSession(long sessionId, int sessionTimeout) {
         touchTable.put(sessionId, sessionTimeout);
         return true;

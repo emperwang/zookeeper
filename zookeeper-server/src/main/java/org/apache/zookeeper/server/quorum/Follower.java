@@ -58,18 +58,26 @@ public class Follower extends Learner{
      *
      * @throws InterruptedException
      */
+    // 和leader进行同步
     void followLeader() throws InterruptedException {
+        // 选举结束时间
         self.end_fle = Time.currentElapsedTime();
+        // 选举时间
         long electionTimeTaken = self.end_fle - self.start_fle;
+        // 记录选举花费时间
         self.setElectionTimeTaken(electionTimeTaken);
         LOG.info("FOLLOWING - LEADER ELECTION TOOK - {}", electionTimeTaken);
         self.start_fle = 0;
         self.end_fle = 0;
         fzk.registerJMX(new FollowerBean(this, zk), self.jmxLocalPeerBean);
         try {
+            // 获取leader信息
             QuorumServer leaderServer = findLeader();            
             try {
+                // 连接到 leader
                 connectToLeader(leaderServer.addr, leaderServer.hostname);
+                // 向 leader注册自己的信息
+                // 并得到 leader的 zxid
                 long newEpochZxid = registerWithLeader(Leader.FOLLOWERINFO);
 
                 //check to see if the leader zxid is lower than ours
@@ -80,11 +88,15 @@ public class Follower extends Learner{
                             + " is less than our accepted epoch " + ZxidUtils.zxidToString(self.getAcceptedEpoch()));
                     throw new IOException("Error: Epoch of leader is lower");
                 }
+                // 和leader同步
+                // **********************************
                 syncWithLeader(newEpochZxid);                
                 QuorumPacket qp = new QuorumPacket();
                 //  到这里就不出去了  持续读取数据  进行处理
                 while (this.isRunning()) {
+                    // 读取数据
                     readPacket(qp);
+                    // 处理数据
                     processPacket(qp);
                 }
             } catch (Exception e) {
@@ -110,9 +122,11 @@ public class Follower extends Learner{
      */
     protected void processPacket(QuorumPacket qp) throws IOException{
         switch (qp.getType()) {
+            // ping 数据处理
         case Leader.PING:            
             ping(qp);            
             break;
+            // 事务一阶段  提议
         case Leader.PROPOSAL:            
             TxnHeader hdr = new TxnHeader();
             Record txn = SerializeUtils.deserializeTxn(qp.getData(), hdr);
@@ -123,18 +137,23 @@ public class Follower extends Learner{
                         + Long.toHexString(lastQueued + 1));
             }
             lastQueued = hdr.getZxid();
+            // 处理此事务
             fzk.logRequest(hdr, txn);
             break;
+            // 事务提交
         case Leader.COMMIT:
+            // 事务提交
             fzk.commit(qp.getZxid());
             break;
         case Leader.UPTODATE:
             LOG.error("Received an UPTODATE message after Follower started");
             break;
+            // 重新认证
         case Leader.REVALIDATE:
             revalidate(qp);
             break;
         case Leader.SYNC:
+            // 同步
             fzk.sync();
             break;
         default:

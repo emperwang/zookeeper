@@ -191,6 +191,7 @@ public class Learner {
     /**
      * Returns the address of the node we think is the leader.
      */
+    // 查找leader
     protected QuorumServer findLeader() {
         QuorumServer leaderServer = null;
         // Find the leader by id
@@ -296,6 +297,7 @@ public class Learner {
         	} else {
         		throw new IOException("Leaders epoch, " + newEpoch + " is less than accepted epoch, " + self.getAcceptedEpoch());
         	}
+        	// 响应epoch
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
         	writePacket(ackNewEpoch, true);
             return ZxidUtils.makeZxid(newEpoch, 0);
@@ -307,6 +309,7 @@ public class Learner {
                 LOG.error("First packet should have been NEWLEADER");
                 throw new IOException("First packet should have been NEWLEADER");
             }
+            // 返回leader的 zxid
             return qp.getZxid();
         }
     } 
@@ -325,7 +328,9 @@ public class Learner {
         // For SNAP and TRUNC the snapshot is needed to save that history
         boolean snapshotNeeded = true;
         readPacket(qp);
+        // 记录提交的 commitedId, zxid
         LinkedList<Long> packetsCommitted = new LinkedList<Long>();
+        // 记录那些未提交的 packet
         LinkedList<PacketInFlight> packetsNotCommitted = new LinkedList<PacketInFlight>();
         synchronized (zk) {
             if (qp.getType() == Leader.DIFF) {
@@ -336,7 +341,9 @@ public class Learner {
                 LOG.info("Getting a snapshot from leader 0x" + Long.toHexString(qp.getZxid()));
                 // The leader is going to dump the database
                 // clear our own database and read
+                // 准备接收leader发送过来的snap数据
                 zk.getZKDatabase().clear();
+                // 读取leader发送的 snap数据
                 zk.getZKDatabase().deserializeSnapshot(leaderIs);
                 String signature = leaderIs.readString("signature");
                 if (!signature.equals("BenWasHere")) {
@@ -348,6 +355,7 @@ public class Learner {
                 //we need to truncate the log to the lastzxid of the leader
                 LOG.warn("Truncating log to get in sync with the leader 0x"
                         + Long.toHexString(qp.getZxid()));
+                // 截断日志
                 boolean truncated=zk.getZKDatabase().truncateLog(qp.getZxid());
                 if (!truncated) {
                     // not able to truncate the log
@@ -363,6 +371,7 @@ public class Learner {
                 System.exit(13);
 
             }
+            // 创建sessionTracker
             zk.createSessionTracker();
             
             long lastQueued = 0;
@@ -379,6 +388,7 @@ public class Learner {
             while (self.isRunning()) {
                 readPacket(qp);
                 switch(qp.getType()) {
+                    // 事务一阶段 提议
                 case Leader.PROPOSAL:
                     PacketInFlight pif = new PacketInFlight();
                     pif.hdr = new TxnHeader();
@@ -390,8 +400,10 @@ public class Learner {
                             + Long.toHexString(lastQueued + 1));
                     }
                     lastQueued = pif.hdr.getZxid();
+                    // 记录未提交的 packet
                     packetsNotCommitted.add(pif);
                     break;
+                    // 提交操作
                 case Leader.COMMIT:
                     if (!writeToTxnLog) {
                         pif = packetsNotCommitted.peekFirst();
@@ -402,10 +414,12 @@ public class Learner {
                             packetsNotCommitted.remove();
                         }
                     } else {
+                        // 记录提交的 zxid
                         packetsCommitted.add(qp.getZxid());
                     }
                     break;
                 case Leader.INFORM:
+                    // 通知消息
                     /*
                      * Only observer get this type of packet. We treat this
                      * as receiving PROPOSAL and COMMMIT.
@@ -434,6 +448,7 @@ public class Learner {
                         zk.takeSnapshot();
                         self.setCurrentEpoch(newEpoch);
                     }
+                    // 同步完成信息
                     self.cnxnFactory.setZooKeeperServer(zk);                
                     break outerLoop;
                 case Leader.NEWLEADER: // Getting NEWLEADER here instead of in discovery 
@@ -442,6 +457,7 @@ public class Learner {
                     // epoch is set. QuorumPeer.loadDataBase() uses this file to
                     // detect the case where the server was terminated after
                     // taking a snapshot but before setting the current epoch.
+                    // updatingEpoch 文件
                     File updating = new File(self.getTxnFactory().getSnapDir(),
                                         QuorumPeer.UPDATING_EPOCH_FILENAME);
                     if (!updating.exists() && !updating.createNewFile()) {
@@ -449,6 +465,7 @@ public class Learner {
                                               updating.toString());
                     }
                     if (snapshotNeeded) {
+                        // 快照
                         zk.takeSnapshot();
                     }
                     self.setCurrentEpoch(newEpoch);
@@ -458,6 +475,7 @@ public class Learner {
                     }
                     writeToTxnLog = true; //Anything after this needs to go to the transaction log, not applied directly in memory
                     isPreZAB1_0 = false;
+                    // 回复响应 ACK 消息
                     writePacket(new QuorumPacket(Leader.ACK, newLeaderZxid, null, null), true);
                     break;
                 }
@@ -466,6 +484,7 @@ public class Learner {
         ack.setZxid(ZxidUtils.makeZxid(newEpoch, 0));
         writePacket(ack, true);
         sock.setSoTimeout(self.tickTime * self.syncLimit);
+        // 同步完成后 就可以启动了
         zk.startup();
         /*
          * Update the election vote here to ensure that all members of the
@@ -479,9 +498,11 @@ public class Learner {
         // We need to log the stuff that came in between the snapshot and the uptodate
         if (zk instanceof FollowerZooKeeperServer) {
             FollowerZooKeeperServer fzk = (FollowerZooKeeperServer)zk;
+            // 处理未提交的 请求
             for(PacketInFlight p: packetsNotCommitted) {
                 fzk.logRequest(p.hdr, p.rec);
             }
+            // 提交 zxid
             for(Long zxid: packetsCommitted) {
                 fzk.commit(zxid);
             }
@@ -511,7 +532,7 @@ public class Learner {
             throw new UnsupportedOperationException("Unknown server type");
         }
     }
-    
+    // 重新认证
     protected void revalidate(QuorumPacket qp) throws IOException {
         ByteArrayInputStream bis = new ByteArrayInputStream(qp
                 .getData());

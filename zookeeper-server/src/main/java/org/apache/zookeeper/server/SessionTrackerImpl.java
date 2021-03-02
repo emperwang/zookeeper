@@ -42,11 +42,11 @@ import org.apache.zookeeper.common.Time;
  */
 public class SessionTrackerImpl extends ZooKeeperCriticalThread implements SessionTracker {
     private static final Logger LOG = LoggerFactory.getLogger(SessionTrackerImpl.class);
-
+    // key=sessionid,  value为 session
     HashMap<Long, SessionImpl> sessionsById = new HashMap<Long, SessionImpl>();
-
+    // key为超时时间, SessionSet存储对应的这个点超时的那些session
     HashMap<Long, SessionSet> sessionSets = new HashMap<Long, SessionSet>();
-
+    //
     ConcurrentHashMap<Long, Integer> sessionsWithTimeout;
     long nextSessionId = 0;
     long nextExpirationTime;
@@ -152,9 +152,11 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
                 if (set != null) {
                     for (SessionImpl s : set.sessions) {
                         setSessionClosing(s.sessionId);
+                        // 这里的具体超时关闭操作时,提交一个closeSession 的操作请求
                         expirer.expire(s);
                     }
                 }
+                // 下次超时检测时间
                 nextExpirationTime += expirationInterval;
             }
         } catch (InterruptedException e) {
@@ -198,10 +200,12 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         if (LOG.isTraceEnabled()) {
             LOG.info("Session closing: 0x" + Long.toHexString(sessionId));
         }
+        // 根据sessionId获取session
         SessionImpl s = sessionsById.get(sessionId);
         if (s == null) {
             return;
         }
+        // 设置session的标志为关闭
         s.isClosing = true;
     }
 
@@ -269,12 +273,14 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
             throw new KeeperException.SessionMovedException();
         }
     }
-
+    // 设置session的拥有者
     synchronized public void setOwner(long id, Object owner) throws SessionExpiredException {
+        // 根据id获取到对应的session
         SessionImpl session = sessionsById.get(id);
         if (session == null || session.isClosing()) {
             throw new KeeperException.SessionExpiredException();
         }
+        // 设置session的拥有者
         session.owner = owner;
     }
 }

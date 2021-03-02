@@ -47,12 +47,15 @@ import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 
 public class NettyServerCnxnFactory extends ServerCnxnFactory {
     Logger LOG = LoggerFactory.getLogger(NettyServerCnxnFactory.class);
-
+    // server端
     ServerBootstrap bootstrap;
+    //
     Channel parentChannel;
+    // 记录所有的channel
     ChannelGroup allChannels = new DefaultChannelGroup("zkServerCnxns");
     HashMap<InetAddress, Set<NettyServerCnxn>> ipMap =
         new HashMap<InetAddress, Set<NettyServerCnxn>>( );
+    // 地址
     InetSocketAddress localAddress;
     int maxClientCnxns = 60;
     
@@ -61,6 +64,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
      * NettyServerCnxnFactory already extends ServerCnxnFactory. By making it inner
      * this class gets access to the member variables and methods.
      */
+    // netty的channel处理器
     @Sharable
     class CnxnChannelHandler extends SimpleChannelHandler {
 
@@ -71,6 +75,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Channel closed " + e);
             }
+            // 关闭事件的处理
             allChannels.remove(ctx.getChannel());
         }
 
@@ -81,10 +86,12 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Channel connected " + e);
             }
+            // channel连接的处理
             allChannels.add(ctx.getChannel());
             NettyServerCnxn cnxn = new NettyServerCnxn(ctx.getChannel(),
                     zkServer, NettyServerCnxnFactory.this);
             ctx.setAttachment(cnxn);
+            // 连接和 远端地址的对应关系 记录
             addCnxn(cnxn);
         }
 
@@ -95,6 +102,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Channel disconnected " + e);
             }
+            // channel 断开连接的处理
             NettyServerCnxn cnxn = (NettyServerCnxn) ctx.getAttachment();
             if (cnxn != null) {
                 if (LOG.isTraceEnabled()) {
@@ -108,6 +116,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
             throws Exception
         {
+            // 异常处理
             LOG.warn("Exception caught " + e, e.getCause());
             NettyServerCnxn cnxn = (NettyServerCnxn) ctx.getAttachment();
             if (cnxn != null) {
@@ -117,7 +126,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
                 cnxn.close();
             }
         }
-
+        // 信息接收处理
         @Override
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
             throws Exception
@@ -132,6 +141,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
                 }
                 NettyServerCnxn cnxn = (NettyServerCnxn)ctx.getAttachment();
                 synchronized(cnxn) {
+                    // 信息处理
                     processMessage(e, cnxn);
                 }
             } catch(Exception ex) {
@@ -155,6 +165,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
                                 + " queuedBuffer 0x"
                                 + ChannelBuffers.hexDump(cnxn.queuedBuffer));
                     }
+                    // 开始接收信息
                     cnxn.receiveMessage(cnxn.queuedBuffer);
                     if (!cnxn.queuedBuffer.readable()) {
                         LOG.debug("Processed queue - no bytes remaining");
@@ -239,9 +250,9 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
         }
         
     }
-    
+        // 创建handler
     CnxnChannelHandler channelHandler = new CnxnChannelHandler();
-    
+    // 初始化 netty server端
     NettyServerCnxnFactory() {
         bootstrap = new ServerBootstrap(
                 new NioServerSocketChannelFactory(
@@ -253,7 +264,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
         bootstrap.setOption("child.tcpNoDelay", true);
         /* set socket linger to off, so that socket close does not block */
         bootstrap.setOption("child.soLinger", -1);
-
+        // 添加处理器
         bootstrap.getPipeline().addLast("servercnxnfactory", channelHandler);
     }
     
@@ -358,6 +369,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
     @Override
     public void start() {
         LOG.info("binding to port " + localAddress);
+        // 地址绑定
         parentChannel = bootstrap.bind(localAddress);
     }
 
@@ -384,13 +396,16 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
         synchronized (cnxns) {
             cnxns.add(cnxn);
             synchronized (ipMap){
+                // 获取远端连接的地址
                 InetAddress addr =
                     ((InetSocketAddress)cnxn.channel.getRemoteAddress())
                         .getAddress();
+                // 获取地ip对应的连接
                 Set<NettyServerCnxn> s = ipMap.get(addr);
                 if (s == null) {
                     s = new HashSet<NettyServerCnxn>();
                 }
+                // 信息记录
                 s.add(cnxn);
                 ipMap.put(addr,s);
             }

@@ -85,7 +85,7 @@ public class FinalRequestProcessor implements RequestProcessor {
     public FinalRequestProcessor(ZooKeeperServer zks) {
         this.zks = zks;
     }
-
+    // 最终的请求处理
     public void processRequest(Request request) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Processing request:: " + request);
@@ -115,7 +115,8 @@ public class FinalRequestProcessor implements RequestProcessor {
             if (request.hdr != null) {
                TxnHeader hdr = request.hdr;
                Record txn = request.txn;
-
+                // 处理事务
+                // *************
                rc = zks.processTxn(hdr, txn);
             }
             // do not add non quorum packets to the queue.
@@ -169,7 +170,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 lastOp = "PING";
                 cnxn.updateStatsForResponse(request.cxid, request.zxid, lastOp,
                         request.createTime, Time.currentElapsedTime());
-
+                // 发送响应
                 cnxn.sendResponse(new ReplyHeader(-2,
                         zks.getZKDatabase().getDataTreeLastProcessedZxid(), 0), null, "response");
                 return;

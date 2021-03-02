@@ -46,9 +46,11 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
     /**
      * Requests that have been committed.
      */
+    // 记录那些进行了 committed的 request
     LinkedList<Request> committedRequests = new LinkedList<Request>();
-
+    // 下一个处理器
     RequestProcessor nextProcessor;
+    // 等待处理的请求
     ArrayList<Request> toProcess = new ArrayList<Request>();
 
     /**
@@ -72,6 +74,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         try {
             Request nextPending = null;            
             while (!finished) {
+                // 如果有等待处理的请求
+                // 则把等待处理的请求 给到下一个处理器进行处理
                 int len = toProcess.size();
                 for (int i = 0; i < len; i++) {
                     nextProcessor.processRequest(toProcess.get(i));
@@ -80,6 +84,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                 synchronized (this) {
                     if ((queuedRequests.size() == 0 || nextPending != null)
                             && committedRequests.size() == 0) {
+                        // 如果没有 请求的话, 则等待
                         wait();
                         continue;
                     }
@@ -114,12 +119,15 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
                 // We haven't matched the pending requests, so go back to
                 // waiting
+                // 这里相当于 nextPending 表示下一个等待处理的请求
+                // 此请求会和 committedRequests中的请求 配对, 配对成功后才会进行下一步处理
                 if (nextPending != null) {
                     continue;
                 }
 
                 synchronized (this) {
                     // Process the next requests in the queuedRequests
+                    // 获取队列中的请求, 进行处理
                     while (nextPending == null && queuedRequests.size() > 0) {
                         Request request = queuedRequests.remove();
                         switch (request.type) {
@@ -152,7 +160,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         }
         LOG.info("CommitProcessor exited loop!");
     }
-
+    // 请求 commit
     synchronized public void commit(Request request) {
         if (!finished) {
             if (request == null) {
@@ -163,11 +171,13 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Committing request:: " + request);
             }
+            // 记录committed request
+            // 即 保存其那些 提交的request
             committedRequests.add(request);
             notifyAll();
         }
     }
-
+    // 处理请求
     synchronized public void processRequest(Request request) {
         // request.addRQRec(">commit");
         if (LOG.isDebugEnabled()) {
@@ -175,6 +185,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         }
         
         if (!finished) {
+            // 同样是把请求缓存起来
             queuedRequests.add(request);
             notifyAll();
         }

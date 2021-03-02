@@ -120,6 +120,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     public void run() {
         try {
             while (true) {
+                // 获取请求
                 Request request = submittedRequests.take();
                 long traceMask = ZooTrace.CLIENT_REQUEST_TRACE_MASK;
                 if (request.type == OpCode.ping) {
@@ -131,6 +132,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (Request.requestOfDeath == request) {
                     break;
                 }
+                // 请求处理
                 pRequest(request);
             }
         } catch (RequestProcessorException e) {
@@ -349,6 +351,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (createMode.isSequential()) {
                     path = path + String.format(Locale.ENGLISH, "%010d", parentCVersion);
                 }
+                // path校验
                 validatePath(path, request.sessionId);
                 try {
                     if (getRecordForPath(path) != null) {
@@ -361,6 +364,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
                 }
+                // newCversion
                 int newCversion = parentRecord.stat.getCversion()+1;
                 request.txn = new CreateTxn(path, createRequest.getData(),
                         listACL,
@@ -370,8 +374,11 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                     s.setEphemeralOwner(request.sessionId);
                 }
                 parentRecord = parentRecord.duplicate(request.hdr.getZxid());
+                // 父节点的 child数量增加
                 parentRecord.childCount++;
+                // 父节点的额 Cversion 更新
                 parentRecord.stat.setCversion(newCversion);
+                // 记录这个两个  record
                 addChangeRecord(parentRecord);
                 addChangeRecord(new ChangeRecord(request.hdr.getZxid(), path, s,
                         0, listACL));
@@ -678,6 +685,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
             }
         }
         request.zxid = zks.getZxid();
+        // 使用下一个处理器进行处理
         nextProcessor.processRequest(request);
     }
 
@@ -759,7 +767,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         }
         return acl.size() > 0;
     }
-
+    // 可以看到 PrepRequestProcessor 处理器只是把请求缓存起来
+    // 之后缓存的请求 会在 PrepRequestProcessor 线程处理函数run中统一处理
     public void processRequest(Request request) {
         // request.addRQRec(">prep="+zks.outstandingChanges.size());
         submittedRequests.add(request);

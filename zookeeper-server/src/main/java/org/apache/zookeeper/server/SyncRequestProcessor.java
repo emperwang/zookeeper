@@ -139,9 +139,11 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                     // track the number of records written to the log
                     if (zks.getZKDatabase().append(si)) {
                         logCount++;
+                        // 当日志操作次数 大于后面这个数字后, 就会滚动
                         if (logCount > (snapCount / 2 + randRoll)) {
                             setRandRoll(r.nextInt(snapCount/2));
                             // roll the log
+                            // 日志滚动
                             zks.getZKDatabase().rollLog();
                             // take a snapshot
                             if (snapInProcess != null && snapInProcess.isAlive()) {
@@ -225,7 +227,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
             nextProcessor.shutdown();
         }
     }
-
+    // 同步处理器, 同样也是 把请求缓存下来
     public void processRequest(Request request) {
         // request.addRQRec(">sync");
         queuedRequests.add(request);

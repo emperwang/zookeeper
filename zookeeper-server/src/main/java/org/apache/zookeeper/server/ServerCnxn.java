@@ -405,7 +405,7 @@ public abstract class ServerCnxn implements Stats, Watcher {
     protected long incrPacketsSent() {
         return packetsSent.incrementAndGet();
     }
-
+    // 更新state
     protected synchronized void updateStatsForResponse(long cxid, long zxid,
             String op, long start, long end)
     {

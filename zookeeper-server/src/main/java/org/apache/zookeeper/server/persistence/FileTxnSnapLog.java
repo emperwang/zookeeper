@@ -294,6 +294,7 @@ public class FileTxnSnapLog {
      * serialized onto disk
      * @throws IOException
      */
+    // 快照操作
     public void save(DataTree dataTree,
             ConcurrentHashMap<Long, Integer> sessionsWithTimeouts)
         throws IOException {

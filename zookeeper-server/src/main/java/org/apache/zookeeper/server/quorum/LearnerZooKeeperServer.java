@@ -68,7 +68,7 @@ public abstract class LearnerZooKeeperServer extends QuorumZooKeeperServer {
     public long getServerId() {
         return self.getId();
     }    
-    
+        /// 创建session  tracker
     @Override
     public void createSessionTracker() {
         sessionTracker = new LearnerSessionTracker(this, getZKDatabase()

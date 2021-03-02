@@ -430,7 +430,9 @@ public class DataTree {
             updateCount(lastPrefix, 1);
             updateBytes(lastPrefix, data == null ? 0 : data.length);
         }
+        // 监听器 触发
         dataWatches.triggerWatch(path, Event.EventType.NodeCreated);
+        // 监听器触发
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 Event.EventType.NodeChildrenChanged);
         return path;
@@ -696,7 +698,7 @@ public class DataTree {
     }
 
     public volatile long lastProcessedZxid = 0;
-
+    // 事务处理
     public ProcessTxnResult processTxn(TxnHeader header, Record txn)
     {
         ProcessTxnResult rc = new ProcessTxnResult();

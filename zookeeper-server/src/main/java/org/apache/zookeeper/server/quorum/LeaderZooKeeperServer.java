@@ -55,19 +55,25 @@ public class LeaderZooKeeperServer extends QuorumZooKeeperServer {
     public Leader getLeader(){
         return self.leader;
     }
-    
+    // 创建好处理器链
+    // 用于链式处理请求
     @Override
     protected void setupRequestProcessors() {
+        // 最后一个处理器是 FinalRequestProcessor
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
+        // 第五个处理器是 Leader.ToBeAppliedRequestProcessor
         RequestProcessor toBeAppliedProcessor = new Leader.ToBeAppliedRequestProcessor(
                 finalProcessor, getLeader().toBeApplied);
+        // 第三个处理器是  CommitProcessor, 用于事务提交处理
         commitProcessor = new CommitProcessor(toBeAppliedProcessor,
                 Long.toString(getServerId()), false,
                 getZooKeeperServerListener());
         commitProcessor.start();
+        // 第二个处理器 是ProposalRequestProcessor, 用于事务处理相关的
         ProposalRequestProcessor proposalProcessor = new ProposalRequestProcessor(this,
                 commitProcessor);
         proposalProcessor.initialize();
+        // 第一个处理器是  PrepRequestProcessor
         firstProcessor = new PrepRequestProcessor(this, proposalProcessor);
         ((PrepRequestProcessor)firstProcessor).start();
     }

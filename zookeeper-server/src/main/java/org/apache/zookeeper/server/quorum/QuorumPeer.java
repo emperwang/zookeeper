@@ -1476,15 +1476,17 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
 		}
 		return acceptedEpoch;
 	}
-	
+	// 设置当前 epoch
 	public void setCurrentEpoch(long e) throws IOException {
 		currentEpoch = e;
+		// 把当前 接收到的 当前 epoch记录到 currentEpoch 文件中
 		writeLongToFile(CURRENT_EPOCH_FILENAME, e);
 		
 	}
-	
+	// 设置当前实例接收到  epoch
 	public void setAcceptedEpoch(long e) throws IOException {
 		acceptedEpoch = e;
+		// 把接收到 Epoch写出 到acceptedEpoch 文件中
 		writeLongToFile(ACCEPTED_EPOCH_FILENAME, e);
 	}
 

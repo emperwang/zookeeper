@@ -151,7 +151,7 @@ public class NettyServerCnxn extends ServerCnxn {
         @Override
         public ChannelFuture getFuture() {return null;}
     };
-    
+        /// 发送响应
     @Override
     public void sendResponse(ReplyHeader h, Record r, String tag)
             throws IOException {
@@ -174,6 +174,7 @@ public class NettyServerCnxn extends ServerCnxn {
         byte b[] = baos.toByteArray();
         ByteBuffer bb = ByteBuffer.wrap(b);
         bb.putInt(b.length - 4).rewind();
+        // 数据发送
         sendBuffer(bb);
         if (h.getXid() > 0) {
             // zks cannot be null otherwise we would not have gotten here!
@@ -731,7 +732,7 @@ public class NettyServerCnxn extends ServerCnxn {
         }
         return false;
     }
-
+    /// 接收信息
     public void receiveMessage(ChannelBuffer message) {
         try {
             while(message.readable() && !throttled) {
@@ -774,6 +775,8 @@ public class NettyServerCnxn extends ServerCnxn {
                         if (zks == null || !zks.isRunning()) {
                             throw new IOException("ZK down");
                         }
+                        // zkserver 开始处理 packet 信息
+                        // *********************************
                         if (initialized) {
                             zks.processPacket(this, bb);
 

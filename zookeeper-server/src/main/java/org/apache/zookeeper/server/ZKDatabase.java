@@ -331,6 +331,7 @@ public class ZKDatabase {
      * @return the result of processing the transaction on this
      * datatree/zkdatabase
      */
+    // 处理事物
     public ProcessTxnResult processTxn(TxnHeader hdr, Record txn) {
         return dataTree.processTxn(hdr, txn);
     }
