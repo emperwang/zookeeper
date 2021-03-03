@@ -113,7 +113,9 @@ public class FinalRequestProcessor implements RequestProcessor {
                 }
             }
             if (request.hdr != null) {
+                // 事务header
                TxnHeader hdr = request.hdr;
+               // 此事务具体对应的  request
                Record txn = request.txn;
                 // 处理事务
                 // *************
@@ -121,6 +123,7 @@ public class FinalRequestProcessor implements RequestProcessor {
             }
             // do not add non quorum packets to the queue.
             if (Request.isQuorum(request.type)) {
+                // 记录此 request对应的proposal 事务一阶段
                 zks.getZKDatabase().addCommittedProposal(request);
             }
         }
@@ -134,6 +137,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 // close session response being lost - we've already closed
                 // the session/socket here before we can send the closeSession
                 // in the switch block below
+                // 直接响应结果
                 scxn.closeSession(request.sessionId);
                 return;
             }
@@ -150,11 +154,12 @@ public class FinalRequestProcessor implements RequestProcessor {
         Record rsp = null;
         boolean closeSession = false;
         try {
+            // 对异常的处理
             if (request.hdr != null && request.hdr.getType() == OpCode.error) {
                 throw KeeperException.create(KeeperException.Code.get((
                         (ErrorTxn) request.txn).getErr()));
             }
-
+            /// 异常的处理
             KeeperException ke = request.getException();
             if (ke != null && request.type != OpCode.multi) {
                 throw ke;
@@ -181,7 +186,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 lastOp = "SESS";
                 cnxn.updateStatsForResponse(request.cxid, request.zxid, lastOp,
                         request.createTime, Time.currentElapsedTime());
-
+                // 这里完成后  就会进行数据的响应
                 zks.finishSessionInit(request.cnxn, true);
                 return;
             }
@@ -409,6 +414,7 @@ public class FinalRequestProcessor implements RequestProcessor {
         }
 
         long lastZxid = zks.getZKDatabase().getDataTreeLastProcessedZxid();
+        // 响应 header
         ReplyHeader hdr =
             new ReplyHeader(request.cxid, lastZxid, err.intValue());
 
@@ -417,6 +423,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                     request.createTime, Time.currentElapsedTime());
 
         try {
+            // 发送响应数据
             cnxn.sendResponse(hdr, rsp, "response");
             if (closeSession) {
                 cnxn.sendCloseSession();

@@ -176,7 +176,9 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
 
     void addChangeRecord(ChangeRecord c) {
         synchronized (zks.outstandingChanges) {
+            // 记录这个请求
             zks.outstandingChanges.add(c);
+            // 记录这个 请求 和 path的映射关系
             zks.outstandingChangesForPath.put(c.path, c);
         }
     }
@@ -324,7 +326,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                                     Time.currentWallTime(), type);
 
         switch (type) {
-            case OpCode.create:                
+            case OpCode.create:
+                // session的检测
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
                 CreateRequest createRequest = (CreateRequest)record;   
                 if(deserialize)

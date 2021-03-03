@@ -45,6 +45,8 @@ public class ProposalRequestProcessor implements RequestProcessor {
         // 下一个处理
         this.nextProcessor = nextProcessor;
         // 创建一个 ACK 处理器
+        // 此会等待outstandingProposals中发布的那些proposal,等待超过半数的follower进行响应
+        // 如果响应数超过半数后 会把此 propsal进行 commit
         AckRequestProcessor ackProcessor = new AckRequestProcessor(zks.getLeader());
         // 创建同步请求处理器
         syncProcessor = new SyncRequestProcessor(zks, ackProcessor);
@@ -82,6 +84,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
                 // We need to sync and get consensus on any transactions
                 try {
                     // leader 事务的一阶段 即 事务提议
+                    // 把此proposal 提议发送到其他  follower后, 会记录此 proposal到outstandingProposals, 用于后面的事务提交
                     zks.getLeader().propose(request);
                 } catch (XidRolloverException e) {
                     throw new RequestProcessorException(e.getMessage(), e);

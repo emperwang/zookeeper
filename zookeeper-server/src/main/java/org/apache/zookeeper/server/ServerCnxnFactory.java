@@ -50,6 +50,8 @@ public abstract class ServerCnxnFactory {
     private static final Logger LOG = LoggerFactory.getLogger(ServerCnxnFactory.class);
 
     // sessionMap is used to speed up closeSession()
+    // 这里存储每一个session 和 ServerCnxn的对应关系
+    // 其中 key为 sessionId   value为: ServerCnxn
     protected final ConcurrentMap<Long, ServerCnxn> sessionMap =
             new ConcurrentHashMap<Long, ServerCnxn>();
 

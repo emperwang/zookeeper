@@ -70,7 +70,9 @@ public class ZKDatabase {
     protected long minCommittedLog, maxCommittedLog;
     public static final int commitLogCount = 500;
     protected static int commitLogBuffer = 700;
+    // 记录 leader 准备提交的 proposal 即 事务提议
     protected LinkedList<Proposal> committedLog = new LinkedList<Proposal>();
+    // 读写锁
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
     volatile private boolean initialized = false;
     
@@ -244,6 +246,7 @@ public class ZKDatabase {
      * fast follower synchronization.
      * @param request committed request
      */
+    // 记录提交的 提议 : 事务一阶段
     public void addCommittedProposal(Request request) {
         WriteLock wl = logLock.writeLock();
         try {
@@ -257,12 +260,14 @@ public class ZKDatabase {
                 maxCommittedLog = request.zxid;
             }
 
-            //
+            // 序列化 rrequest
             byte[] data = SerializeUtils.serializeRequest(request);
+            // 创建 事务的 一阶段 proposal 提交
             QuorumPacket pp = new QuorumPacket(Leader.PROPOSAL, request.zxid, data, null);
             Proposal p = new Proposal();
             p.packet = pp;
             p.request = request;
+            // 记录此 packet
             committedLog.add(p);
             maxCommittedLog = p.packet.getZxid();
         } finally {

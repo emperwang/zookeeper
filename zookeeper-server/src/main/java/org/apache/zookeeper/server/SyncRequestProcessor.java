@@ -137,6 +137,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 }
                 if (si != null) {
                     // track the number of records written to the log
+                    // 这里把 request 记录写入到 log日志文件中
                     if (zks.getZKDatabase().append(si)) {
                         logCount++;
                         // 当日志操作次数 大于后面这个数字后, 就会滚动
@@ -149,6 +150,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                             if (snapInProcess != null && snapInProcess.isAlive()) {
                                 LOG.warn("Too busy to snap, skipping");
                             } else {
+                                // 后台启动一个线程来做 一个 snapshot 快照
                                 snapInProcess = new ZooKeeperThread("Snapshot Thread") {
                                         public void run() {
                                             try {
@@ -167,6 +169,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                         // iff this is a read, and there are no pending
                         // flushes (writes), then just pass this to the next
                         // processor
+                        // 这里会把 处理完的请求 交给下一个处理器 进行处理
                         if (nextProcessor != null) {
                             nextProcessor.processRequest(si);
                             if (nextProcessor instanceof Flushable) {
@@ -175,6 +178,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                         }
                         continue;
                     }
+                    // 这里上面把请求处理完成后, 会添加到  toFlush,
                     toFlush.add(si);
                     if (toFlush.size() > 1000) {
                         flush(toFlush);

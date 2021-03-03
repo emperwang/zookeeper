@@ -687,6 +687,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             baos.close();
             ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
             bb.putInt(bb.remaining() - 4).rewind();
+            // 数据发送
             cnxn.sendBuffer(bb);    
 
             if (!valid) {
@@ -1083,9 +1084,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // sessionId
         long sessionId = hdr.getClientId();
         // 处理事务
+        //*******************
+        // 如: create操作, 在内存db中创建对应的 dataNode节点,并保存起来
         rc = getZKDatabase().processTxn(hdr, txn);
         // 创建 session
         if (opCode == OpCode.createSession) {
+            // 创建 session操作
             if (txn instanceof CreateSessionTxn) {
                 CreateSessionTxn cst = (CreateSessionTxn) txn;
                 sessionTracker.addSession(sessionId, cst
@@ -1097,6 +1101,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
             // 关闭session
         } else if (opCode == OpCode.closeSession) {
+            // 关闭session操作
             sessionTracker.removeSession(sessionId);
         }
         return rc;

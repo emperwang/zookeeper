@@ -298,10 +298,11 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
         if (LOG.isDebugEnabled()) {
             LOG.debug("closeSession sessionid:0x" + sessionId);
         }
-
+        // 移除sesionId对应的ServerCnxn
         NettyServerCnxn cnxn = (NettyServerCnxn) sessionMap.remove(sessionId);
         if (cnxn != null) {
             try {
+                // 关闭操作
                 cnxn.close();
             } catch (Exception e) {
                 LOG.warn("exception during session close", e);

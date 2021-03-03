@@ -42,6 +42,8 @@ class AckRequestProcessor implements RequestProcessor {
      */
     public void processRequest(Request request) {
         QuorumPeer self = leader.self;
+        // 对 request进行响应
+        // 即对于事务的请求 进行提交
         if(self != null)
             leader.processAck(self.getId(), request.zxid, null);
         else

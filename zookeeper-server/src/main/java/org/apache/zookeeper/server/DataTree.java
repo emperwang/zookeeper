@@ -76,11 +76,14 @@ public class DataTree {
      * This hashtable provides a fast lookup to the datanodes. The tree is the
      * source of truth and is where all the locking occurs
      */
+    // 存储所有的节点信心
+    // key为 path路径,  value 为: 节点 信息
+    // 表示节点的 dataNode 是可序列化的
     private final ConcurrentHashMap<String, DataNode> nodes =
         new ConcurrentHashMap<String, DataNode>();
-
+    // 监听器
     private final WatchManager dataWatches = new WatchManager();
-
+    // 监听器
     private final WatchManager childWatches = new WatchManager();
 
     /** the root of zookeeper tree */
@@ -105,11 +108,14 @@ public class DataTree {
     /**
      * the path trie that keeps track fo the quota nodes in this datatree
      */
+    // 记录zookeeper自身的配置信息  quota 配额信息
     private final PathTrie pTrie = new PathTrie();
 
     /**
      * This hashtable lists the paths of the ephemeral nodes of a session.
      */
+    // 此记录了 一个session对应的节点信息
+    // Key为sessionId, value为: 对应的节点路径
     private final Map<Long, HashSet<String>> ephemerals =
         new ConcurrentHashMap<Long, HashSet<String>>();
 
@@ -363,28 +369,40 @@ public class DataTree {
      * @return the patch of the created node
      * @throws KeeperException
      */
+    // 创建 node节点
     public String createNode(String path, byte data[], List<ACL> acl,
             long ephemeralOwner, int parentCVersion, long zxid, long time)
             throws KeeperException.NoNodeException,
             KeeperException.NodeExistsException {
         int lastSlash = path.lastIndexOf('/');
+        // 得到要创建路径的 父亲 节点路径
         String parentName = path.substring(0, lastSlash);
+        // 得到 具体要创建的 路径
         String childName = path.substring(lastSlash + 1);
+        // 记录 此节点的信息, 可以序列化
         StatPersisted stat = new StatPersisted();
+        // 创建时间
         stat.setCtime(time);
+        // 修改时间
         stat.setMtime(time);
+        // zxid
         stat.setCzxid(zxid);
+        // 修改时的 zxid
         stat.setMzxid(zxid);
         stat.setPzxid(zxid);
         stat.setVersion(0);
         stat.setAversion(0);
+        // 设置拥有者, 对应的sessionId
         stat.setEphemeralOwner(ephemeralOwner);
+        // 得到父节点
         DataNode parent = nodes.get(parentName);
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (parent) {
+            // 得到 父节点的所有子节点
             Set<String> children = parent.getChildren();
+            // 如果已经有此节点, 则报错
             if (children.contains(childName)) {
                 throw new KeeperException.NodeExistsException();
             }
@@ -392,20 +410,26 @@ public class DataTree {
             if (parentCVersion == -1) {
                 parentCVersion = parent.stat.getCversion();
                 parentCVersion++;
-            }    
+            }
+            // cVersion, 记录修改的次数
             parent.stat.setCversion(parentCVersion);
             parent.stat.setPzxid(zxid);
             Long longval = aclCache.convertAcls(acl);
+            // 创建子节点
             DataNode child = new DataNode(parent, data, longval, stat);
+            // 把子节点信息 记录到 父节点中
             parent.addChild(childName);
+            // 记录此新 创建的 节点
             nodes.put(path, child);
             if (ephemeralOwner != 0) {
+                // 获取此 sessionId 创建的 节点
                 HashSet<String> list = ephemerals.get(ephemeralOwner);
                 if (list == null) {
                     list = new HashSet<String>();
                     ephemerals.put(ephemeralOwner, list);
                 }
                 synchronized (list) {
+                    // 添加到此sessionId 对应的容器
                     list.add(path);
                 }
             }
@@ -447,28 +471,40 @@ public class DataTree {
      *            the current zxid
      * @throws KeeperException.NoNodeException
      */
+    // 删除节点操作
     public void deleteNode(String path, long zxid)
             throws KeeperException.NoNodeException {
         int lastSlash = path.lastIndexOf('/');
+        // 获取要删除节点的 父节点
         String parentName = path.substring(0, lastSlash);
+        // 具体要删除节点的名字
         String childName = path.substring(lastSlash + 1);
+        // 得到要删除的节点
         DataNode node = nodes.get(path);
+        // 如果节点不存在, 则报错
         if (node == null) {
             throw new KeeperException.NoNodeException();
         }
+        // 删除节点操作
         nodes.remove(path);
         synchronized (node) {
+            // acl 缓存的删除
             aclCache.removeUsage(node.acl);
         }
+        // 得到要删除节点的父节点
         DataNode parent = nodes.get(parentName);
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (parent) {
+            // 删除父节点的 子节点信息
             parent.removeChild(childName);
+            // 这里更新父节点的 Pzxid信息, 更新为当前的zxid
             parent.stat.setPzxid(zxid);
+            // 获取要删除节点的 sessionId信息
             long eowner = node.stat.getEphemeralOwner();
             if (eowner != 0) {
+                // 从对应的 sessionId对应的队列中 删除此节点
                 HashSet<String> nodes = ephemerals.get(eowner);
                 if (nodes != null) {
                     synchronized (nodes) {
@@ -476,8 +512,10 @@ public class DataTree {
                     }
                 }
             }
+            // 被删除节点的 父节点 赋值为 null
             node.parent = null;
         }
+        // /zookeeper 子节点删除的操作
         if (parentName.startsWith(procZookeeper)) {
             // delete the node in the trie.
             if (Quotas.limitNode.equals(childName)) {
@@ -488,6 +526,7 @@ public class DataTree {
         }
 
         // also check to update the quotas for this node
+        // 配额 信息更新
         String lastPrefix;
         if((lastPrefix = getMaxPrefixWithQuota(path)) != null) {
             // ok we have some match and need to update
@@ -504,8 +543,10 @@ public class DataTree {
             ZooTrace.logTraceMessage(LOG, ZooTrace.EVENT_DELIVERY_TRACE_MASK,
                     "childWatches.triggerWatch " + parentName);
         }
+        // 触发 watcher 调用
         Set<Watcher> processed = dataWatches.triggerWatch(path,
                 EventType.NodeDeleted);
+        // 触发 子节点的 watcher 调用
         childWatches.triggerWatch(path, EventType.NodeDeleted, processed);
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 EventType.NodeChildrenChanged);
@@ -666,7 +707,8 @@ public class DataTree {
         public String path;
 
         public Stat stat;
-
+        // 多个事务共同操作的结果
+        // 即list中每一个 result对应一个事务的操作结果
         public List<ProcessTxnResult> multiResult;
         
         /**
@@ -701,6 +743,7 @@ public class DataTree {
     // 事务处理
     public ProcessTxnResult processTxn(TxnHeader header, Record txn)
     {
+        // 记录事务处理结果
         ProcessTxnResult rc = new ProcessTxnResult();
 
         try {
@@ -710,10 +753,14 @@ public class DataTree {
             rc.type = header.getType();
             rc.err = 0;
             rc.multiResult = null;
+            // 根据 不同的类型 来进行对应的操作
             switch (header.getType()) {
                 case OpCode.create:
+                    // 转换为  CreateTxn 创建事务
                     CreateTxn createTxn = (CreateTxn) txn;
+                    // 创建的path
                     rc.path = createTxn.getPath();
+                    // 创建节点
                     createNode(
                             createTxn.getPath(),
                             createTxn.getData(),
@@ -725,6 +772,7 @@ public class DataTree {
                 case OpCode.delete:
                     DeleteTxn deleteTxn = (DeleteTxn) txn;
                     rc.path = deleteTxn.getPath();
+                    // 删除节点的操作
                     deleteNode(deleteTxn.getPath(), header.getZxid());
                     break;
                 case OpCode.setData:
@@ -741,6 +789,7 @@ public class DataTree {
                             setACLTxn.getVersion());
                     break;
                 case OpCode.closeSession:
+                    // 关闭session操作
                     killSession(header.getClientId(), header.getZxid());
                     break;
                 case OpCode.error:
@@ -839,6 +888,7 @@ public class DataTree {
          * with the file.
          */
         if (rc.zxid > lastProcessedZxid) {
+            // 更新事务 zxid
         	lastProcessedZxid = rc.zxid;
         }
 
@@ -877,7 +927,7 @@ public class DataTree {
         }
         return rc;
     }
-
+    // 关闭session 操作
     void killSession(long session, long zxid) {
         // the list is already removed from the ephemerals
         // so we do not have to worry about synchronizing on
@@ -885,10 +935,14 @@ public class DataTree {
         // so there is no need for synchronization. The list is not
         // changed here. Only create and delete change the list which
         // are again called from FinalRequestProcessor in sequence.
+        // 这里可以看到针对 要关闭的session, 首先要获取到 此session期间创建的 临时节点
+        // 然后便利 这些节点, 把节点信息删除
         HashSet<String> list = ephemerals.remove(session);
         if (list != null) {
+            // 遍历 节点进行删除
             for (String path : list) {
                 try {
+                    // 删除节点操作
                     deleteNode(path, zxid);
                     if (LOG.isDebugEnabled()) {
                         LOG

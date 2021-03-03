@@ -41,16 +41,19 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
     /**
      * Requests that we are holding until the commit comes in.
      */
+    // 缓存 过来的请求
     LinkedList<Request> queuedRequests = new LinkedList<Request>();
 
     /**
      * Requests that have been committed.
      */
     // 记录那些进行了 committed的 request
+    // 当那些请求 被commmit后, 会记录到此
     LinkedList<Request> committedRequests = new LinkedList<Request>();
     // 下一个处理器
     RequestProcessor nextProcessor;
-    // 等待处理的请求
+    // 记录那些可以由 下一次处理器处理的请求
+    // 如: 已经 committed的request
     ArrayList<Request> toProcess = new ArrayList<Request>();
 
     /**
@@ -76,6 +79,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
             while (!finished) {
                 // 如果有等待处理的请求
                 // 则把等待处理的请求 给到下一个处理器进行处理
+                // toProcess中的request是 处理过的请求
+                // 简单说: 如果request是事务类型的, 那么当request添加到 toProcess后, 此事务已经是提交状态的
                 int len = toProcess.size();
                 for (int i = 0; i < len; i++) {
                     nextProcessor.processRequest(toProcess.get(i));
@@ -107,6 +112,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                             nextPending.hdr = r.hdr;
                             nextPending.txn = r.txn;
                             nextPending.zxid = r.zxid;
+                            // 这里把 等待处理的 request 缓存到  toProcess中
                             toProcess.add(nextPending);
                             nextPending = null;
                         } else {
@@ -130,6 +136,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                     // 获取队列中的请求, 进行处理
                     while (nextPending == null && queuedRequests.size() > 0) {
                         Request request = queuedRequests.remove();
+                        // 这里可以看到 对于事务型的请求, 会缓存,等待其commit后才会处理
                         switch (request.type) {
                         case OpCode.create:
                         case OpCode.delete:
@@ -144,6 +151,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                             if (matchSyncs) {
                                 nextPending = request;
                             } else {
+                                // 同步的请求 直接处理
                                 toProcess.add(request);
                             }
                             break;
