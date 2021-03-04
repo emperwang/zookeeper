@@ -191,8 +191,10 @@ public class NIOServerCnxn extends ServerCnxn {
     }
 
     /** Read the request payload (everything following the length prefix) */
+    // 对读取到的数据 具体处理
     private void readPayload() throws IOException, InterruptedException {
         if (incomingBuffer.remaining() != 0) { // have we read length bytes?
+            // 数据的读
             int rc = sock.read(incomingBuffer); // sock is non-blocking, so ok
             if (rc < 0) {
                 throw new EndOfStreamException(
@@ -203,11 +205,16 @@ public class NIOServerCnxn extends ServerCnxn {
         }
 
         if (incomingBuffer.remaining() == 0) { // have we read length bytes?
+            // 更新packet的接收数量
             packetReceived();
             incomingBuffer.flip();
             if (!initialized) {
+                // 开始处理 连接请求
+                // **********************
                 readConnectRequest();
             } else {
+                // 开始处理 读取的request
+                // **********************
                 readRequest();
             }
             lenBuffer.clear();
@@ -234,6 +241,7 @@ public class NIOServerCnxn extends ServerCnxn {
     /**
      * Handles read/write IO on connection.
      */
+    // 对NIO的连接 进行具体 IO操作的地方
     void doIO(SelectionKey k) throws InterruptedException {
         try {
             if (isSocketOpen() == false) {
@@ -242,7 +250,9 @@ public class NIOServerCnxn extends ServerCnxn {
 
                 return;
             }
+            // 读操作
             if (k.isReadable()) {
+                // 这里读取 数据的长度值
                 int rc = sock.read(incomingBuffer);
                 if (rc < 0) {
                     throw new EndOfStreamException(
@@ -254,6 +264,7 @@ public class NIOServerCnxn extends ServerCnxn {
                     boolean isPayload;
                     if (incomingBuffer == lenBuffer) { // start of next request
                         incomingBuffer.flip();
+                        // 读取数据的长度
                         isPayload = readLength(k);
                         incomingBuffer.clear();
                     } else {
@@ -261,6 +272,8 @@ public class NIOServerCnxn extends ServerCnxn {
                         isPayload = true;
                     }
                     if (isPayload) { // not the case for 4letterword
+                        // 读取数据
+                        //***************************
                         readPayload();
                     }
                     else {
@@ -270,6 +283,7 @@ public class NIOServerCnxn extends ServerCnxn {
                     }
                 }
             }
+            // 写操作
             if (k.isWritable()) {
                 // ZooLog.logTraceMessage(LOG,
                 // ZooLog.CLIENT_DATA_PACKET_TRACE_MASK
@@ -319,7 +333,7 @@ public class NIOServerCnxn extends ServerCnxn {
                      * 0. This sets us up for the write.
                      */
                     directBuffer.flip();
-
+                    /// 写出 数据
                     int sent = sock.write(directBuffer);
                     ByteBuffer bb;
 
@@ -347,7 +361,7 @@ public class NIOServerCnxn extends ServerCnxn {
                     // ZooLog.CLIENT_DATA_PACKET_TRACE_MASK, "after send,
                     // outgoingBuffers.size() = " + outgoingBuffers.size());
                 }
-
+                // 更新 selectionKey 的事件
                 synchronized(this.factory){
                     if (outgoingBuffers.size() == 0) {
                         if (!initialized
@@ -388,7 +402,7 @@ public class NIOServerCnxn extends ServerCnxn {
             close();
         }
     }
-
+    // 对读取的 packet 进行处理
     private void readRequest() throws IOException {
         zkServer.processPacket(this, incomingBuffer);
     }

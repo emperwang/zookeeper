@@ -366,13 +366,16 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             super(msg);
         }
     }
-    
+    // 更新session的超时时间
     void touch(ServerCnxn cnxn) throws MissingSessionException {
         if (cnxn == null) {
             return;
         }
+        // 获取sessionId
         long id = cnxn.getSessionId();
+        // 获取超时 deadline
         int to = cnxn.getSessionTimeout();
+        // 更新超时时间
         if (!sessionTracker.touchSession(id, to)) {
             throw new MissingSessionException(
                     "No session with sessionid 0x" + Long.toHexString(id)
@@ -618,14 +621,16 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         return sessionId != 0
                 && Arrays.equals(passwd, generatePasswd(sessionId));
     }
-
+    // 创建 一个新的  session
     long createSession(ServerCnxn cnxn, byte passwd[], int timeout) {
+        // 创建session
         long sessionId = sessionTracker.createSession(timeout);
         Random r = new Random(sessionId ^ superSecret);
         r.nextBytes(passwd);
         ByteBuffer to = ByteBuffer.allocate(4);
         to.putInt(timeout);
         cnxn.setSessionId(sessionId);
+        // 提交创建session的 request
         submitRequest(cnxn, sessionId, OpCode.createSession, 0, to, null);
         return sessionId;
     }
@@ -728,7 +733,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      */
     private void submitRequest(ServerCnxn cnxn, long sessionId, int type,
             int xid, ByteBuffer bb, List<Id> authInfo) {
+        // 创建  request
         Request si = new Request(cnxn, sessionId, xid, type, bb, authInfo);
+        // 提交 request
         submitRequest(si);
     }
         // 提交请求到 server
@@ -752,8 +759,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
         }
         try {
+            // 这里更新 session的超时时间
             touch(si.cnxn);
+            // 对 request的类型进行校验
             boolean validpacket = Request.isValid(si.type);
+            // request 有效
+            // 则开始传递到 处理器链 进行request的处理
             if (validpacket) {
                 firstProcessor.processRequest(si);
                 if (si.cnxn != null) {
@@ -889,9 +900,11 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     public int getNumAliveConnections() {
         return serverCnxnFactory.getNumAliveConnections();
     }
-    
+
+    // 处理连接请求
     public void processConnectRequest(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         BinaryInputArchive bia = BinaryInputArchive.getArchive(new ByteBufferInputStream(incomingBuffer));
+        // 连接请求
         ConnectRequest connReq = new ConnectRequest();
         connReq.deserialize(bia, "connect");
         if (LOG.isDebugEnabled()) {
@@ -939,6 +952,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         if (sessionTimeout > maxSessionTimeout) {
             sessionTimeout = maxSessionTimeout;
         }
+        // 设置超时时间
         cnxn.setSessionTimeout(sessionTimeout);
         // We don't want to receive any packets until we are sure that the
         // session is setup
@@ -949,12 +963,15 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             LOG.info("Client attempting to renew session 0x"
                     + Long.toHexString(clientSessionId)
                     + " at " + cnxn.getRemoteSocketAddress());
+            // 关闭session
             serverCnxnFactory.closeSession(sessionId);
             cnxn.setSessionId(sessionId);
+            // 重新打开session;  重新验证 session
             reopenSession(cnxn, sessionId, passwd, sessionTimeout);
         } else {
             LOG.info("Client attempting to establish new session at "
                     + cnxn.getRemoteSocketAddress());
+            // 创建session
             createSession(cnxn, passwd, sessionTimeout);
         }
     }
@@ -965,7 +982,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         }
         return false; 
     }
-
+    // 开始处理接收到的 packet
     public void processPacket(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         // We have the request, now process and setup for next
         InputStream bais = new ByteBufferInputStream(incomingBuffer);
@@ -976,6 +993,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // pointing
         // to the start of the txn
         incomingBuffer = incomingBuffer.slice();
+        // 处理认证 请求
         if (h.getType() == OpCode.auth) {
             LOG.info("got auth packet " + cnxn.getRemoteSocketAddress());
             AuthPacket authPacket = new AuthPacket();
@@ -1018,6 +1036,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
             return;
         } else {
+            // 非认证
+            // 处理 sasl
             if (h.getType() == OpCode.sasl) {
                 Record rsp = processSasl(incomingBuffer,cnxn);
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0, KeeperException.Code.OK.intValue());
@@ -1025,10 +1045,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 return;
             }
             else {
+                // 其他一般请求的处理
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 si.setOwner(ServerCnxn.me);
                 // 提交信息 给处理器链 处理
+                // 把接收到的packet提交到  实例进行处理
                 submitRequest(si);
             }
         }
@@ -1076,7 +1098,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // wrap SASL response token to client inside a Response object.
         return new SetSASLResponse(responseToken);
     }
-    
+        // 对事务性请求的处理
     public ProcessTxnResult processTxn(TxnHeader hdr, Record txn) {
         ProcessTxnResult rc;
         // 操作码

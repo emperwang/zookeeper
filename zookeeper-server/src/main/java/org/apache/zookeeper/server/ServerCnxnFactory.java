@@ -106,14 +106,19 @@ public abstract class ServerCnxnFactory {
     }
 
     public abstract void closeAll();
-    
+
+    // 创建连接器的factory实例
     static public ServerCnxnFactory createFactory() throws IOException {
+        // ZOOKEEPER_SERVER_CNXN_FACTORY = "zookeeper.serverCnxnFactory"
+        // 这里是从配置中获取配置的要实例化的类
         String serverCnxnFactoryName =
             System.getProperty(ZOOKEEPER_SERVER_CNXN_FACTORY);
+        // 如果没有配置, 默认使用 NIO
         if (serverCnxnFactoryName == null) {
             serverCnxnFactoryName = NIOServerCnxnFactory.class.getName();
         }
         try {
+            // 通过反射加载类 并实例化
             ServerCnxnFactory serverCnxnFactory = (ServerCnxnFactory) Class.forName(serverCnxnFactoryName)
                     .getDeclaredConstructor().newInstance();
             LOG.info("Using {} as server connection factory", serverCnxnFactoryName);

@@ -383,6 +383,7 @@ public class FileTxnSnapLog {
      * commit the transaction of logs
      * @throws IOException
      */
+    // log 事务的提交
     public void commit() throws IOException {
         txnLog.commit();
     }

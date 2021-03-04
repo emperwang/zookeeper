@@ -42,7 +42,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
     public ProposalRequestProcessor(LeaderZooKeeperServer zks,
             RequestProcessor nextProcessor) {
         this.zks = zks;
-        // 下一个处理
+        // 下一个处理 是CommitProcessor
         this.nextProcessor = nextProcessor;
         // 创建一个 ACK 处理器
         // 此会等待outstandingProposals中发布的那些proposal,等待超过半数的follower进行响应

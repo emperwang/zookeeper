@@ -46,11 +46,13 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
     HashMap<Long, SessionImpl> sessionsById = new HashMap<Long, SessionImpl>();
     // key为超时时间, SessionSet存储对应的这个点超时的那些session
     HashMap<Long, SessionSet> sessionSets = new HashMap<Long, SessionSet>();
-    //
+    // key为sessionId， value为 超时时间
     ConcurrentHashMap<Long, Integer> sessionsWithTimeout;
+    // 创建sessionId时 使用
     long nextSessionId = 0;
+    // 下次过期时间
     long nextExpirationTime;
-
+    // 过期时间 间隔
     int expirationInterval;
 
     public static class SessionImpl implements Session {
@@ -164,7 +166,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         }
         LOG.info("SessionTrackerImpl exited loop!");
     }
-
+    // 更新session的超时时间
     synchronized public boolean touchSession(long sessionId, int timeout) {
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG,
@@ -172,16 +174,21 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
                                      "SessionTrackerImpl --- Touch session: 0x"
                     + Long.toHexString(sessionId) + " with timeout " + timeout);
         }
+        // 得到sessionId对应的 session
         SessionImpl s = sessionsById.get(sessionId);
         // Return false, if the session doesn't exists or marked as closing
         if (s == null || s.isClosing()) {
             return false;
         }
+        // 计算 超时 时间
+        // 超时时间是 expirationInterval的 整数倍
         long expireTime = roundToInterval(Time.currentElapsedTime() + timeout);
         if (s.tickTime >= expireTime) {
             // Nothing needs to be done
             return true;
         }
+        // 得到此超时 时间对应的session集合
+        // 这里简单来说 就是更新 超时时间对应的 session 集合
         SessionSet set = sessionSets.get(s.tickTime);
         if (set != null) {
             set.sessions.remove(s);
@@ -236,16 +243,19 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         }
     }
 
-
+    // 创建 session
     synchronized public long createSession(int sessionTimeout) {
         addSession(nextSessionId, sessionTimeout);
         return nextSessionId++;
     }
-
+    // 添加一个新的session
     synchronized public void addSession(long id, int sessionTimeout) {
+        // 记录此session的超时时间
         sessionsWithTimeout.put(id, sessionTimeout);
         if (sessionsById.get(id) == null) {
+            // 创建session
             SessionImpl s = new SessionImpl(id, sessionTimeout, 0);
+            // 记录session
             sessionsById.put(id, s);
             if (LOG.isTraceEnabled()) {
                 ZooTrace.logTraceMessage(LOG, ZooTrace.SESSION_TRACE_MASK,
@@ -259,6 +269,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
                         + Long.toHexString(id) + " " + sessionTimeout);
             }
         }
+        // 更新session的超时时间
         touchSession(id, sessionTimeout);
     }
 

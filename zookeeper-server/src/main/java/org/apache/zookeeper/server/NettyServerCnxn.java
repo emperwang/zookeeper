@@ -752,7 +752,9 @@ public class NettyServerCnxn extends ServerCnxn {
                         int newLimit = bb.position() + message.readableBytes();
                         bb.limit(newLimit);
                     }
+                    // 把message消息写入到  bb  中
                     message.readBytes(bb);
+                    // 重制 limit
                     bb.limit(bb.capacity());
 
                     if (LOG.isTraceEnabled()) {
@@ -786,6 +788,7 @@ public class NettyServerCnxn extends ServerCnxn {
                         } else {
                             LOG.debug("got conn req request from "
                                     + getRemoteSocketAddress());
+                            // 处理那些 连接请求
                             zks.processConnectRequest(this, bb);
                             initialized = true;
                         }

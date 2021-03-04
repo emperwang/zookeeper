@@ -490,6 +490,7 @@ public class ZKDatabase {
      * commit to the underlying transaction log
      * @throws IOException
      */
+    // log日志的 flush
     public void commit() throws IOException {
         this.snapLog.commit();
     }

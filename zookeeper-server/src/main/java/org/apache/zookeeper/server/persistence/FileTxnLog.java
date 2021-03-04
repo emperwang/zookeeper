@@ -123,6 +123,7 @@ public class FileTxnLog implements TxnLog {
     File logDir;
     private final boolean forceSync = !System.getProperty("zookeeper.forceSync", "yes").equals("no");;
     long dbId;
+    // 等待 flush的 log 输出流
     private LinkedList<FileOutputStream> streamsToFlush =
         new LinkedList<FileOutputStream>();
     File logFileWrite = null;
@@ -321,19 +322,23 @@ public class FileTxnLog implements TxnLog {
      * commit the logs. make sure that evertyhing hits the
      * disk
      */
+    // 事务提交
     public synchronized void commit() throws IOException {
         if (logStream != null) {
             logStream.flush();
         }
+        // 把那些等待 flush的输出流 都进行 flush操作
         for (FileOutputStream log : streamsToFlush) {
             log.flush();
+            // 如果强制 flush
             if (forceSync) {
                 long startSyncNS = System.nanoTime();
-
+                // 刷新
                 log.getChannel().force(false);
-
+                // 刷新的结束时间
                 long syncElapsedMS =
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startSyncNS);
+                // 大于 flush的世间 阈值, 则警告
                 if (syncElapsedMS > fsyncWarningThresholdMS) {
                     if(serverStats != null) {
                         serverStats.incrementFsyncThresholdExceedCount();

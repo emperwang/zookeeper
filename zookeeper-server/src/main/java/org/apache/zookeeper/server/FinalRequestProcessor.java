@@ -168,6 +168,7 @@ public class FinalRequestProcessor implements RequestProcessor {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("{}",request);
             }
+            // 准备响应的数据
             switch (request.type) {
             case OpCode.ping: {
                 zks.serverStats().updateLatency(request.createTime);

@@ -754,6 +754,8 @@ public class DataTree {
             rc.err = 0;
             rc.multiResult = null;
             // 根据 不同的类型 来进行对应的操作
+            // 应用事务,即 把request的操作,再内存db中实现一下
+            // 这里是: 先应用事务  然后再更新zxid 事务ID
             switch (header.getType()) {
                 case OpCode.create:
                     // 转换为  CreateTxn 创建事务

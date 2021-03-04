@@ -88,6 +88,8 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
             }
             // channel连接的处理
             allChannels.add(ctx.getChannel());
+            // 这里可以看到针对每一个连接 会创建对应的  NettyServerCnxn
+            // 具体的消息读取 是由NettyServerCnxn类负责的
             NettyServerCnxn cnxn = new NettyServerCnxn(ctx.getChannel(),
                     zkServer, NettyServerCnxnFactory.this);
             ctx.setAttachment(cnxn);
@@ -149,7 +151,7 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
                 throw ex;
             }
         }
-
+        // 对接收到的 消息 进行处理
         private void processMessage(MessageEvent e, NettyServerCnxn cnxn) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug(Long.toHexString(cnxn.sessionId) + " queuedBuffer: "
@@ -221,6 +223,8 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
                             LOG.debug("Processed queue - bytes remaining");
                         }
                     } else {
+                        // 接收消息
+                        // **************************
                         cnxn.receiveMessage(buf);
                         if (buf.readable()) {
                             if (LOG.isTraceEnabled()) {
@@ -314,8 +318,11 @@ public class NettyServerCnxnFactory extends ServerCnxnFactory {
     public void configure(InetSocketAddress addr, int maxClientCnxns)
             throws IOException
     {
+        // 认证相关
         configureSaslLogin();
+        // 本地地址
         localAddress = addr;
+        // 最大连接数
         this.maxClientCnxns = maxClientCnxns;
     }
 

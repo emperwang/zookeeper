@@ -576,6 +576,7 @@ public class Leader {
      *                the zxid of the proposal sent out
      * @param followerAddr
      */
+    // leader处理事务的ack
     synchronized public void processAck(long sid, long zxid, SocketAddress followerAddr) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Ack zxid: 0x{}", Long.toHexString(zxid));
@@ -586,7 +587,7 @@ public class Leader {
             }
             LOG.trace("outstanding proposals all");
         }
-
+        // zxid最大  回滚
         if ((zxid & 0xffffffffL) == 0) {
             /*
              * We no longer process NEWLEADER ack by this method. However,
@@ -595,13 +596,14 @@ public class Leader {
              */
             return;
         }
-    
+        // 如果没有输出的 一阶段事务, 则不需要处理ack
         if (outstandingProposals.size() == 0) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("outstanding is 0");
             }
             return;
         }
+        // 已有事务大于 当前的事务, 则不处理
         if (lastCommitted >= zxid) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("proposal has already been committed, pzxid: 0x{} zxid: 0x{}",
@@ -610,13 +612,14 @@ public class Leader {
             // The proposal has already been committed
             return;
         }
+        // 获取到 要等待 ack的 一阶段事务
         Proposal p = outstandingProposals.get(zxid);
         if (p == null) {
             LOG.warn("Trying to commit future proposal: zxid 0x{} from {}",
                     Long.toHexString(zxid), followerAddr);
             return;
         }
-        // 记录响应的 sid
+        // 记录记录自己的sid
         p.ackSet.add(sid);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Count for zxid: 0x{} is {}",
@@ -629,6 +632,7 @@ public class Leader {
                         Long.toHexString(zxid), followerAddr);
                 LOG.warn("First is 0x{}", Long.toHexString(lastCommitted + 1));
             }
+            // 如果响应大于 半数, 则说明此 proposal 生效
             // 则移除此 porposal
             outstandingProposals.remove(zxid);
             if (p.request != null) {
@@ -640,11 +644,13 @@ public class Leader {
                 LOG.warn("Going to commmit null request for proposal: {}", p);
             }
             // 超过半数响应则 提交此 zxid
+            // 发送 COMMIT 包到各个 follower, 告知此 事务 可以提交了
             commit(zxid);
             // 通知集群中 observer节点
             inform(p);
-            // 记录此请求
+            // 调用 commitProcessor 进行此 reqeust的提交
             zk.commitProcessor.commit(p.request);
+            // 对于那些 缓存的 同步请求 ,进行处理
             if(pendingSyncs.containsKey(zxid)){
                 for(LearnerSyncRequest r: pendingSyncs.remove(zxid)) {
                     // 把此请求发送到对应的follower中
@@ -716,6 +722,7 @@ public class Leader {
      * @param qp
      *                the packet to be sent
      */
+    // 发送 一阶段 提交到 集群中的 各个 follower
     void sendPacket(QuorumPacket qp) {
         synchronized (forwardingFollowers) {
             for (LearnerHandler f : forwardingFollowers) {                
@@ -740,6 +747,7 @@ public class Leader {
      * 
      * @param zxid
      */
+    // 事务提交
     public void commit(long zxid) {
         synchronized(this){
             lastCommitted = zxid;
@@ -753,6 +761,7 @@ public class Leader {
      * @param zxid
      * @param proposal
      */
+    // 通知 observer 事务提交
     public void inform(Proposal proposal) {   
         QuorumPacket qp = new QuorumPacket(Leader.INFORM, proposal.request.zxid, 
                                             proposal.packet.getData(), null);
@@ -830,6 +839,7 @@ public class Leader {
             // 发送同步请求到 对应的 follower
             sendSync(r);
         } else {
+            // 缓存请求  等待后面处理
             List<LearnerSyncRequest> l = pendingSyncs.get(lastProposed);
             if (l == null) {
                 l = new ArrayList<LearnerSyncRequest>();
@@ -1005,6 +1015,8 @@ public class Leader {
                 + getSidSetString(newLeaderProposal.ackSet)
                 + " ]; starting up and setting last processed zxid: 0x{}",
                 Long.toHexString(zk.getZxid()));
+        // ****************************
+        // zk启动, 其中报错处理器链的 创建
         zk.startup();
         /*
          * Update the election vote here to ensure that all members of the

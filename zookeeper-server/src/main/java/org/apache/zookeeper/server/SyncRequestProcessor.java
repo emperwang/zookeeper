@@ -113,6 +113,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         randRoll = roll;
     }
 
+    // 同步处理器 对请求的处理
     @Override
     public void run() {
         try {
@@ -123,21 +124,29 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
             setRandRoll(r.nextInt(snapCount/2));
             while (true) {
                 Request si = null;
+                // 获取缓存的请求进行处理
                 if (toFlush.isEmpty()) {
                     si = queuedRequests.take();
                 } else {
                     si = queuedRequests.poll();
+                    // 如果没有请求,则尝试 进行 log的 flush操作
                     if (si == null) {
+                        // *****************************
+                        // 再次flush操作中,
+                        // 1. 会把log日志的输出流进行flush
+                        // 2. 会处理这些proposal 的ack, 当ack超过半数时, 才会进行提交操作; 提交了的request才能进入下一步
                         flush(toFlush);
                         continue;
                     }
                 }
+                // 停止操作
                 if (si == requestOfDeath) {
                     break;
                 }
                 if (si != null) {
                     // track the number of records written to the log
                     // 这里把 request 记录写入到 log日志文件中
+                    // *******************
                     if (zks.getZKDatabase().append(si)) {
                         logCount++;
                         // 当日志操作次数 大于后面这个数字后, 就会滚动
@@ -180,6 +189,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                     }
                     // 这里上面把请求处理完成后, 会添加到  toFlush,
                     toFlush.add(si);
+                    // 个数太大时, 也会进行一次 flush
                     if (toFlush.size() > 1000) {
                         flush(toFlush);
                     }
@@ -191,16 +201,19 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         }
         LOG.info("SyncRequestProcessor exited!");
     }
-
+    // log的 flush操作
     private void flush(LinkedList<Request> toFlush)
         throws IOException, RequestProcessorException
     {
+        // flush为空 不操作
         if (toFlush.isEmpty())
             return;
-
+        //  log日志文件的 flush,即把内存中的数据 flush到 磁盘中
+        // 此处flush时, 不光会flush当前的log输出流, 也会对之前那些没有进行过flush的输出流 进行flush
         zks.getZKDatabase().commit();
         while (!toFlush.isEmpty()) {
             Request i = toFlush.remove();
+            // 把flush中的 请求 交由下一个处理器  ACKRequestProcessor 进行处理
             if (nextProcessor != null) {
                 nextProcessor.processRequest(i);
             }

@@ -72,6 +72,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
     volatile boolean finished = false;
 
+    // 真正的处理 函数
     @Override
     public void run() {
         try {

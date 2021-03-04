@@ -94,9 +94,9 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * should never be useed otherwise
      */
     private static  boolean failCreate = false;
-
+    // 记录提交的请求
     LinkedBlockingQueue<Request> submittedRequests = new LinkedBlockingQueue<Request>();
-
+    // 记录 下一个处理器
     RequestProcessor nextProcessor;
 
     ZooKeeperServer zks;
@@ -145,18 +145,21 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         }
         LOG.info("PrepRequestProcessor exited loop!");
     }
-
+    // 先从outstandingChanges 中 获取 path对应的 changeRecord信息
+    // 如果没有获取到 再去 内存DB中获取对应的数据
     ChangeRecord getRecordForPath(String path) throws KeeperException.NoNodeException {
         ChangeRecord lastChange = null;
         synchronized (zks.outstandingChanges) {
             lastChange = zks.outstandingChangesForPath.get(path);
             if (lastChange == null) {
+                // 去内存db 中获取数据
                 DataNode n = zks.getZKDatabase().getNode(path);
                 if (n != null) {
                     Set<String> children;
                     synchronized(n) {
                         children = n.getChildren();
                     }
+                    // 封装为 changeRecord
                     lastChange = new ChangeRecord(-1, path, n.stat, children.size(),
                             zks.getZKDatabase().aclForNode(n));
                 }
@@ -332,23 +335,30 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 CreateRequest createRequest = (CreateRequest)record;   
                 if(deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, createRequest);
+                // 请求的路径
                 String path = createRequest.getPath();
+                // 最后的一个路径
                 int lastSlash = path.lastIndexOf('/');
                 if (lastSlash == -1 || path.indexOf('\0') != -1 || failCreate) {
                     LOG.info("Invalid path " + path + " with session 0x" +
                             Long.toHexString(request.sessionId));
                     throw new KeeperException.BadArgumentsException(path);
                 }
+                // 移除重复的 ACL
                 List<ACL> listACL = removeDuplicates(createRequest.getAcl());
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
                 }
+                // 父节点的路径
                 String parentPath = path.substring(0, lastSlash);
+                // 获取父节点 的  record
                 ChangeRecord parentRecord = getRecordForPath(parentPath);
-
+                // 检测 ACL, 权限检测
                 checkACL(zks, parentRecord.acl, ZooDefs.Perms.CREATE,
                         request.authInfo);
+                // 父节点的  Cversion
                 int parentCVersion = parentRecord.stat.getCversion();
+                //
                 CreateMode createMode =
                     CreateMode.fromFlag(createRequest.getFlags());
                 if (createMode.isSequential()) {
@@ -357,21 +367,26 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 // path校验
                 validatePath(path, request.sessionId);
                 try {
+                    // 如果存在此 path的 changeRecord 那么报错
                     if (getRecordForPath(path) != null) {
                         throw new KeeperException.NodeExistsException(path);
                     }
                 } catch (KeeperException.NoNodeException e) {
                     // ignore this one
                 }
+                // 父节点的 sessionId
                 boolean ephemeralParent = parentRecord.stat.getEphemeralOwner() != 0;
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
                 }
                 // newCversion
+                // 更新父节点的 Cversion
                 int newCversion = parentRecord.stat.getCversion()+1;
+                // 创建事务 header
                 request.txn = new CreateTxn(path, createRequest.getData(),
                         listACL,
                         createMode.isEphemeral(), newCversion);
+                // 节点要序列化的 信息
                 StatPersisted s = new StatPersisted();
                 if (createMode.isEphemeral()) {
                     s.setEphemeralOwner(request.sessionId);

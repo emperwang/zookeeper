@@ -77,8 +77,10 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
     }
 
     Thread thread;
+    // 配置
     @Override
     public void configure(InetSocketAddress addr, int maxcc) throws IOException {
+        // 认证相关  先掠过
         configureSaslLogin();
 
         thread = new ZooKeeperThread(this, "NIOServerCxn.Factory:" + addr);
@@ -196,40 +198,56 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
             return s.size();
         }
     }
-
+    // 本NIO 具体的处理流程
     public void run() {
         while (!ss.socket().isClosed()) {
             try {
+                // 开始获取 就绪的连接
                 selector.select(1000);
                 Set<SelectionKey> selected;
                 synchronized (this) {
+                    // 得到就绪的keys
                     selected = selector.selectedKeys();
                 }
                 ArrayList<SelectionKey> selectedList = new ArrayList<SelectionKey>(
                         selected);
                 Collections.shuffle(selectedList);
+                // 遍历就绪的keys 处理对应的事件
                 for (SelectionKey k : selectedList) {
+                    // 处理连接事件
                     if ((k.readyOps() & SelectionKey.OP_ACCEPT) != 0) {
+                        // 接收对应 连接的socket
                         SocketChannel sc = ((ServerSocketChannel) k
                                 .channel()).accept();
+                        // 获取对端地址
                         InetAddress ia = sc.socket().getInetAddress();
+                        // 获取此地址对应 的 连接数
                         int cnxncount = getClientCnxnCount(ia);
+                        // 如果此地址连接数 较大，则 关闭此连接
                         if (maxClientCnxns > 0 && cnxncount >= maxClientCnxns){
                             LOG.warn("Too many connections from " + ia
                                      + " - max is " + maxClientCnxns );
                             sc.close();
                         } else {
+                            // 没有超过连接数  开始处理
                             LOG.info("Accepted socket connection from "
                                      + sc.socket().getRemoteSocketAddress());
+                            // 配置为 非阻塞
                             sc.configureBlocking(false);
+                            // 把此注册到 selector
                             SelectionKey sk = sc.register(selector,
                                     SelectionKey.OP_READ);
+                            // 根据此socket 创建对应的 NIOServerCnxn, 由 NIOServerCnxn来实现 对此socket的具体读写操作
                             NIOServerCnxn cnxn = createConnection(sc, sk);
                             sk.attach(cnxn);
+                            // 记录此 NIOServerCnxn
+                            // 用户对 连接数的限制
                             addCnxn(cnxn);
                         }
                     } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
                         NIOServerCnxn c = (NIOServerCnxn) k.attachment();
+                        // 处理具体的 读 或者 写 操作
+                        // *****************************
                         c.doIO(k);
                     } else {
                         if (LOG.isDebugEnabled()) {
@@ -238,6 +256,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
                         }
                     }
                 }
+                // 清除这些 处理过的key
                 selected.clear();
             } catch (RuntimeException e) {
                 LOG.warn("Ignoring unexpected runtime exception", e);
